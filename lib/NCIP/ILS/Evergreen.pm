@@ -310,13 +310,14 @@ sub _init {
             my $asce = $e->retrieve_asset_stat_cat_entry($_->{id});
             push(@{$self->{asces}}, $asce) if ($asce);
         } elsif ($_->{asc} && $_->{name}) {
-            # We may actually want to retrieve the ancestor tree
-            # beginning with $self->{config}->{work_ou} and limit the
-            # next search where the owner is one of those org units.
+            # We want to limit the search to the work org and its
+            # ancestors.
+            my $ancestors = $U->get_org_ancestors($self->{config}->{work_ou});
             my $result = $e->search_asset_stat_cat_entry(
                 {
                     stat_cat => $_->{asc},
-                    value => $_->{name}
+                    value => $_->{name},
+                    owner => $ancestors
                 }
             );
             if ($result && @$result) {
