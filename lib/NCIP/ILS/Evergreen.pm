@@ -112,7 +112,7 @@ sub login {
     my $self = shift;
 
     # Get the authentication seed.
-    my $seed = $U->simple_req(
+    my $seed = $U->simplereq(
         'open-ils.auth',
         'open-ils.auth.authenticate.init',
         $self->{config}->{username}
@@ -120,7 +120,7 @@ sub login {
 
     # Actually login.
     if ($seed) {
-        my $response = $U->simple_req(
+        my $response = $U->simplereq(
             'open-ils.auth',
             'open-ils.auth.authenticate.complete',
             {
