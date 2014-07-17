@@ -16,9 +16,12 @@ package NCIP::ILS::Evergreen;
 use Modern::Perl;
 use Object::Tiny qw/name/;
 use XML::XPath;
-use OpenSRF::System;
-use OpenSRF::Utils::SettingsClient;
+use DateTime;
+use DateTime::Format::ISO8601;
 use Digest::MD5 qw/md5_hex/;
+use OpenSRF::System;
+use OpenSRF::Utils qw/:datetime/;
+use OpenSRF::Utils::SettingsClient;
 use OpenILS::Utils::Fieldmapper;
 use OpenILS::Utils::CStoreEditor qw/:funcs/;
 use OpenILS::Application::AppUtils;
@@ -72,7 +75,97 @@ sub new {
 # Subroutines required by the NCIPServer interface:
 sub itemdata {}
 
-sub userdata {}
+sub userdata {
+    my $self = shift;
+    my $barcode = shift;
+
+    # Check our session and login if necessary.
+    $self->login() unless ($self->checkauth());
+
+    # Initialize the hashref we need to return to the caller.
+    my $userdata = {
+        borrowernumber => '',
+        cardnumber => '',
+        streetnumber => '',
+        address => '',
+        address2 => '',
+        city => '',
+        state => '',
+        zipcode => '',
+        country => '',
+        firstname => '',
+        surname => '',
+        blocked => ''
+    };
+
+    # Look our patron up by barcode:
+    my $user = $U->simplereq(
+        'open-ils.actor',
+        'open-ils.actor.user.fleshed.retrieve_by_barcode',
+        $barcode,
+        0
+    );
+
+    # Check for a failure deleted, inactive, or expired user, and if
+    # so, return empty userdata.
+    if (!$user || $U->event_code($user) || $user->deleted() || !$user->active()
+            || _expired($user) || !$user->card()->active()) {
+        # We'll return the empty userdata hashref to indicate a patron
+        # was not found.
+        return ($userdata, 'Borrower not found');
+    }
+
+    # We also need to check if the barcode used to retrieve the patron
+    # is an active barcode.
+    if (!grep {$_->barcode() eq $barcode && $_->active()} @{$user->cards()}) {
+        return ($userdata, 'Borrower not found');
+    }
+
+    # We got the information, so lets fill in our userdata.
+    $userdata->{borrowernumber} = $user->id();
+    $userdata->{cardnumber} = $user->card()->barcode();
+    $userdata->{firstname} = $user->first_given_name();
+    $userdata->{surname} = $user->family_name();
+    # Use the first address in the array that is valid and not
+    # pending, since no one said whether or not to use billing or
+    # mailing address.
+    my @addrs = grep {$_->valid() && !$_->pending()} @{$user->addresses()};
+    if (@addrs) {
+        $userdata->{city} = $addrs[0]->city();
+        $userdata->{country} = $addrs[0]->country();
+        $userdata->{zipcode} = $addrs[0]->post_code();
+        $userdata->{state} = $addrs[0]->state();
+        $userdate->{address} = $addrs[0]->street1();
+        $userdata->{address2} = $addrs[0]->street2();
+    }
+
+    # Check for barred patron.
+    if ($user->barred()) {
+        $userdata->{blocked} = 1;
+    }
+
+    # Check if the patron's profile is blocked from ILL.
+    if (!$userdata->{blocked} &&
+            grep {$_->id() == $user->profile()} @{$self->{block_profiles}}) {
+        $userdata->{blocked} = 1;
+    }
+
+    # Check for penalties that block CIRC or HOLD.
+    unless ($userdata->{blocked}) {
+        foreach my $penalty (@{$user->standing_penalties()}) {
+            if ($penalty->stand_penalty->block_list()) {
+                my @blocks = split /\|/,
+                    $penalty->standing_penalty->block_list();
+                if (grep /(?:CIRC|HOLD)/, @blocks) {
+                    $userdata->{blocked} = 1;
+                    last;
+                }
+            }
+        }
+    }
+
+    return ($userdata, '');
+}
 
 sub checkin {}
 
@@ -339,6 +432,23 @@ sub _strip {
         $string =~ s/\s+$//;
     }
     return $string;
+}
+
+# Check if a user is past their expiration date.
+sub _expired {
+    my $user = shift;
+    my $expired = 0;
+
+    # Users might not expire.  If so, they have no expire_date.
+    if ($user->expire_date()) {
+        my $expires = DateTime::Format::ISO8601->parse_datetime(
+            cleanse_ISO8601($user->expire_date())
+        )->epoch();
+        my $now = DateTime->now()->epoch();
+        $expired = $now > $expires;
+    }
+
+    return $expired;
 }
 
 1;
