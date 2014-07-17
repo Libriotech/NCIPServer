@@ -98,7 +98,7 @@ sub userdata {
         blocked => ''
     };
 
-    # Look our patron up by barcode:
+    # Look up our patron by barcode:
     my $user = $U->simplereq(
         'open-ils.actor',
         'open-ils.actor.user.fleshed.retrieve_by_barcode',
@@ -106,8 +106,8 @@ sub userdata {
         0
     );
 
-    # Check for a failure deleted, inactive, or expired user, and if
-    # so, return empty userdata.
+    # Check for a failure, or a deleted, inactive, or expired user,
+    # and if so, return empty userdata.
     if (!$user || $U->event_code($user) || $user->deleted() || !$user->active()
             || _expired($user) || !$user->card()->active()) {
         # We'll return the empty userdata hashref to indicate a patron
@@ -150,13 +150,13 @@ sub userdata {
         $userdata->{blocked} = 1;
     }
 
-    # Check for penalties that block CIRC or HOLD.
+    # Check for penalties that block CIRC, HOLD, or RENEW.
     unless ($userdata->{blocked}) {
         foreach my $penalty (@{$user->standing_penalties()}) {
-            if ($penalty->stand_penalty->block_list()) {
+            if ($penalty->standing_penalty->block_list()) {
                 my @blocks = split /\|/,
                     $penalty->standing_penalty->block_list();
-                if (grep /(?:CIRC|HOLD)/, @blocks) {
+                if (grep /(?:CIRC|HOLD|RENEW)/, @blocks) {
                     $userdata->{blocked} = 1;
                     last;
                 }
