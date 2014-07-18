@@ -135,7 +135,7 @@ sub userdata {
         $userdata->{country} = $addrs[0]->country();
         $userdata->{zipcode} = $addrs[0]->post_code();
         $userdata->{state} = $addrs[0]->state();
-        $userdate->{address} = $addrs[0]->street1();
+        $userdata->{address} = $addrs[0]->street1();
         $userdata->{address2} = $addrs[0]->street2();
     }
 
