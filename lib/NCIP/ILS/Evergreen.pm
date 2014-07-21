@@ -15,7 +15,7 @@ package NCIP::ILS::Evergreen;
 
 use Modern::Perl;
 use Object::Tiny qw/name/;
-use XML::XPath;
+use XML::LibXML::Simple qw(XMLin);
 use DateTime;
 use DateTime::Format::ISO8601;
 use Digest::MD5 qw/md5_hex/;
@@ -141,13 +141,13 @@ sub userdata {
 
     # Check for barred patron.
     if ($user->barred()) {
-        $userdata->{blocked} = 1;
+        $userdata->{blocked} = "Patron account barred.";
     }
 
     # Check if the patron's profile is blocked from ILL.
     if (!$userdata->{blocked} &&
             grep {$_->id() == $user->profile()} @{$self->{block_profiles}}) {
-        $userdata->{blocked} = 1;
+        $userdata->{blocked} = "Patron group blocked from ILL.";
     }
 
     # Check for penalties that block CIRC, HOLD, or RENEW.
@@ -157,14 +157,14 @@ sub userdata {
                 my @blocks = split /\|/,
                     $penalty->standing_penalty->block_list();
                 if (grep /(?:CIRC|HOLD|RENEW)/, @blocks) {
-                    $userdata->{blocked} = 1;
+                    $userdata->{blocked} = $penalty->standing_penalty->label();
                     last;
                 }
             }
         }
     }
 
-    return ($userdata, '');
+    return ($userdata, $userdata->{blocked});
 }
 
 sub checkin {}
@@ -266,71 +266,8 @@ sub _configure {
     my $file = OILS_NCIP_CONFIG_DEFAULT;
     $file = $ENV{OILS_NCIP_CONFIG} if ($ENV{OILS_NCIP_CONFIG});
 
-    # Load our configuration with XML::XPath.
-    my $xpath = XML::XPath->new(filename => $file);
-    # Load configuration into $self:
-    $self->{config}->{bootstrap} =
-        _strip($xpath->findvalue("/ncip/bootstrap")->value());
-    $self->{config}->{username} =
-        _strip($xpath->findvalue("/ncip/credentials/username")->value());
-    $self->{config}->{password} =
-        _strip($xpath->findvalue("/ncip/credentials/password")->value());
-    $self->{config}->{work_ou} =
-        _strip($xpath->findvalue("/ncip/credentials/work_ou")->value());
-    $self->{config}->{workstation} =
-        _strip($xpath->findvalue("/ncip/credentials/workstation")->value());
-    # Look for a list of patron profiles to treat as blocked.  This is
-    # useful if you have a patron group or groups that are not
-    # permitted to do ILL.
-    $self->{config}->{barred_groups} = [];
-    my $nodes = $xpath->findnodes('/ncip/patrons/block_profile');
-    if ($nodes) {
-        foreach my $node ($nodes->get_nodelist()) {
-            my $data = {id => 0, name => ""};
-            my $attr = $xpath->findvalue('@pgt', $node);
-            if ($attr) {
-                $data->{id} = $attr;
-            }
-            $data->{name} = _strip($node->string_value());
-            push(@{$self->{config}->{barred_groups}}, $data)
-                if ($data->{id} || $data->{name});
-        }
-    }
-    # Check for the use_precats setting for acceptitem.  This should
-    # only be set if you are using 2.7.0-alpha or later of Evergreen.
-    $self->{config}->{use_precats} = 0;
-    undef($nodes);
-    $nodes = $xpath->find('/ncip/items/use_precats');
-    $self->{config}->{use_precats} = 1 if ($nodes);
-    # If we're not using precats, we will be making "short" bibs.  We
-    # need to look up and see if a special bib source has been
-    # configured for these.
-    undef($nodes);
-    $nodes = $xpath->findnodes('/ncip/items/bib_source');
-    if ($nodes) {
-        my $node = $nodes->get_node(1);
-        my $attr = $xpath->findvalue('@cbs', $node);
-        if ($attr) {
-            $self->{config}->{cbs}->{id} = $attr;
-        }
-        $self->{config}->{cbs}->{name} = _strip($node->string_value());
-    }
-    # Look for any required asset.copy.stat_cat_entry entries.
-    $self->{config}->{asces} = [];
-    undef($nodes);
-    $nodes = $xpath->findnodes('/ncip/items/stat_cat_entry');
-    if ($nodes) {
-        foreach my $node ($nodes->get_nodelist()) {
-            my $data = {asc => 0, id => 0, name => ''};
-            my $asc = $xpath->findvalue('@asc', $node);
-            $data->{asc} = $asc if ($asc);
-            my $asce = $xpath->findvalue('@asce', $node);
-            $data->{id} = $asce if ($asce);
-            $data->{name} = _strip($node->string_value());
-            push(@{$self->{config}->{asces}}, $data)
-                if ($data->{id} || ($data->{name} && $data->{asc}));
-        }
-    }
+    $self->{config} = XMLin($file, NormaliseSpace => 2,
+                            ForceArray => ['block_profile', 'stat_cat_entry']);
 }
 
 # Bootstrap OpenSRF::System, load the IDL, and initialize the
@@ -358,17 +295,21 @@ sub _init {
     # Create an editor.
     my $e = $self->editor();
 
+    # Retrieve the work_ou as an object.
+    my $work_ou = $e->search_actor_org_unit(
+        {shortname => $self->{config}->{credentials}->{work_ou}}
+    );
+    $self->{work_ou} = $work_ou->[0] if ($work_ou && @$work_ou);
+
     # Load the barred groups as pgt objects into a blocked_profiles
     # list.
     $self->{blocked_profiles} = [];
-    foreach (@{$self->{config}->{barred_groups}}) {
-        if ($_->{id}) {
-            my $pgt = $e->retrieve_permission_grp_tree($_->{id});
-            push(@{$self->{blocked_profiles}}, $pgt) if ($pgt);
+    foreach (@{$self->{config}->{patrons}->{block_profile}}) {
+        if (ref $_) {
+            my $pgt = $e->retrieve_permission_grp_tree($_->{grp});
+            push(@{$blocked_profiles}, $pgt) if ($pgt);
         } else {
-            my $result = $e->search_permission_grp_tree(
-                {name => $_->{name}}
-            );
+            my $result = $e->search_permission_grp_tree({name => $_});
             if ($result && @$result) {
                 map {push(@{$self->{blocked_profiles}}, $_)} @$result;
             }
@@ -376,18 +317,17 @@ sub _init {
     }
 
     # Load the bib source if we're not using precats.
-    unless ($self->{config}->{use_precats}) {
+    unless ($self->{config}->{items}->{use_precats}) {
         # Retrieve the default
         my $cbs = $e->retrieve_config_bib_source(BIB_SOURCE_DEFAULT);
-        my $data = $self->{config}->{cbs};
+        my $data = $self->{config}->{items}->{bib_source};
         if ($data) {
-            if ($data->{id}) {
-                my $result = $e->retrieve_config_bib_source($data->{id});
+            $data = $data->[0] if (ref($data) eq 'ARRAY');
+            if (ref $data) {
+                my $result = $e->retrieve_config_bib_source($data->{cbs});
                 $cbs = $result if ($result);
             } else {
-                my $result = $e->search_config_bib_source(
-                    {source => $data->{name}}
-                );
+                my $result = $e->search_config_bib_source({source => $data-});
                 if ($result && @$result) {
                     $cbs = $result->[0]; # Use the first one.
                 }
@@ -397,25 +337,23 @@ sub _init {
     }
 
     # Load the required asset.stat_cat_entries:
-    $self->{asces} = [];
-    foreach (@{$self->{config}->{asces}}) {
-        if ($_->{id}) {
-            my $asce = $e->retrieve_asset_stat_cat_entry($_->{id});
-            push(@{$self->{asces}}, $asce) if ($asce);
-        } elsif ($_->{asc} && $_->{name}) {
-            # We want to limit the search to the work org and its
-            # ancestors.
-            my $ancestors = $U->get_org_ancestors($self->{config}->{work_ou});
-            my $result = $e->search_asset_stat_cat_entry(
-                {
-                    stat_cat => $_->{asc},
-                    value => $_->{name},
-                    owner => $ancestors
-                }
-            );
-            if ($result && @$result) {
-                map {push(@{$self->{asces}}, $_)} @$result;
+    $self->{stat_cat_entries} = [];
+    foreach (@{$self->{config}->{items}->{stat_cat_entry}}) {
+        # Must have the stat_cat attr and the name, so we must have a
+        # reference.
+        next unless(ref $_);
+        # We want to limit the search to the work org and its
+        # ancestors.
+        my $ancestors = $U->get_org_ancestors($self->{work_ou}->id());
+        my $result = $e->search_asset_stat_cat_entry(
+            {
+                stat_cat => $_->{stat_cat},
+                value => $_->{content},
+                owner => $ancestors
             }
+        );
+        if ($result && @$result) {
+            map {push(@{$self->{stat_cat_entries}}, $_)} @$result;
         }
     }
 }
