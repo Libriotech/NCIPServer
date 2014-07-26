@@ -16,22 +16,41 @@
 # You should have received a copy of the GNU General Public License
 # along with NCIPServer.  If not, see <http://www.gnu.org/licenses/>.
 # ---------------------------------------------------------------
-package NCIP::User;
+package NCIP::ILS;
 
-use parent qw(Class::Accessor);
+sub new {
+    my $invocant = shift;
+    my $class = ref $invocant || $invocant;
+    my $self = bless {@_}, $class;
+    return $self;
+}
 
-# User Object needs
-# Authentication Input
-# Block Or Trap
-# Date Of Birth
-# Name Information
-# Previous User Id(s)
-# User Address Information
-# User Language
-# User Privilege
-# User Id
+# Methods required for SHAREit:
 
-# Make accessors for the ones that makes sense
-NCIP::User->mk_accessors(qw(userid ils userdata));
+sub acceptitem {
+}
+
+sub cancelrequestitem {
+}
+
+sub checkinitem {
+}
+
+sub checkoutitem {
+}
+
+sub lookupuser {
+}
+
+sub renewitem {
+}
+
+sub requestitem {
+}
+
+# Other methods, just because.
+
+sub lookupversion {
+}
 
 1;
