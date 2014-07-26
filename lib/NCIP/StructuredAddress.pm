@@ -16,22 +16,10 @@
 # You should have received a copy of the GNU General Public License
 # along with NCIPServer.  If not, see <http://www.gnu.org/licenses/>.
 # ---------------------------------------------------------------
-package NCIP::User;
-
+package NCIP::StructuredAddress;
 use parent qw(Class::Accessor);
 
-# User Object needs
-# Authentication Input
-# Block Or Trap
-# Date Of Birth
-# Name Information
-# Previous User Id(s)
-# User Address Information
-# User Language
-# User Privilege
-# User Id
-
-# Make accessors for the ones that makes sense
-NCIP::User->mk_accessors(qw(userid ils userdata));
+NCIP::StructuredAddress->mk_accessors(qw(line1 line2 locality region postalcode
+                                         country));
 
 1;
