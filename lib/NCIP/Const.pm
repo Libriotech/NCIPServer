@@ -22,7 +22,6 @@ package NCIP::Const;
 # URIs.
 use constant SUPPORTED_VERSIONS => (
     'http://www.niso.org/schemas/ncip/v2_02/ncip_v2_02.xsd',
-    'http://www.niso.org/schemas/ncip/v2_0/ncip_v2_0.xsd'
 );
 
 
