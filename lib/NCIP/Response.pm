@@ -41,6 +41,6 @@ use parent qw(Class::Accessor);
 # supplied the other must be left undefined/unset.  Only 1 header is
 # supported, but it is entirely optional according to the standard.
 
-NCIP::Problem->mk_accessors(qw(type data problem header));
+NCIP::Response->mk_accessors(qw(type data problem header));
 
 1;
