@@ -86,7 +86,8 @@ sub make_header {
     my $header;
 
     for my $key (keys %$request) {
-        if ($request->{$key}->{InitiationHeader}) {
+        if (ref $request->{$key} eq 'HASH'
+                && $request->{$key}->{InitiationHeader}) {
             $initheader = $request->{$key}->{InitiationHeader};
             last;
         }
@@ -94,10 +95,10 @@ sub make_header {
 
     if ($initheader && $initheader->{FromAgencyId}
             && $initheader->{ToAgencyId}) {
-        $header = NCIP::Header->new(
+        $header = NCIP::Header->new({
             FromAgencyId => $initheader->{ToAgencyId},
             ToAgencyId => $initheader->{FromAgencyId}
-        );
+        });
     }
 
     return $header;
