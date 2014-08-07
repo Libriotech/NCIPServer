@@ -16,14 +16,17 @@
 # You should have received a copy of the GNU General Public License
 # along with NCIPServer.  If not, see <http://www.gnu.org/licenses/>.
 # ---------------------------------------------------------------
-package NCIP::StructuredAddress;
+package NCIP::Header;
 use parent qw(Class::Accessor);
 
-# This a "StructuredAddress" as defined by Z39.83-1-2012.  It is used
-# for returning user address information when requested.  The fields
-# are as defined in the standard.
+# This is a NCIP ResponseHeader object.  We do not implement an
+# initator, so we do not implement the InitiationHeader and we do not
+# attempt to make this object generic enough to handle that field.
+# The fields are as defined in Z39.83-1-2012.  Ext is provided but is
+# not used by the current iteration of NCIPServer.
 
-NCIP::StructuredAddress->mk_accessors(qw(line1 line2 locality region postalcode
-                                         country));
+NCIP::Problem->mk_accessors(qw(FromSystemId FromSystemAuthentication
+                               FromAgencyId FromAgencyAuthentication
+                               ToSystemId ToAgencyId Ext));
 
 1;
