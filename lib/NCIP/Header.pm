@@ -25,7 +25,7 @@ use parent qw(Class::Accessor);
 # The fields are as defined in Z39.83-1-2012.  Ext is provided but is
 # not used by the current iteration of NCIPServer.
 
-NCIP::Problem->mk_accessors(qw(FromSystemId FromSystemAuthentication
+NCIP::Header->mk_accessors(qw(FromSystemId FromSystemAuthentication
                                FromAgencyId FromAgencyAuthentication
                                ToSystemId ToAgencyId Ext));
 

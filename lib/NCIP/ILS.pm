@@ -18,6 +18,11 @@
 # ---------------------------------------------------------------
 package NCIP::ILS;
 
+use Modern::Perl;
+use NCIP::Const;
+use NCIP::Header;
+use NCIP::Response;
+
 sub new {
     my $invocant = shift;
     my $class = ref $invocant || $invocant;
@@ -53,6 +58,17 @@ sub requestitem {
 # Handle a LookupVersion Request.  You probably want to just call this
 # one from your subclasses rather than reimplement it.
 sub lookupversion {
+    my $self = shift;
+    my $request = shift;
+
+    my $response = NCIP::Response->new({type => "LookupVersionResponse"});
+    $response->header($self->make_header($request));
+    my $payload = {
+        versions => [ NCIP::Const::SUPPORTED_VERSIONS ]
+    };
+    $response->data($payload);
+
+    return $response;
 }
 
 # A few helper methods:
