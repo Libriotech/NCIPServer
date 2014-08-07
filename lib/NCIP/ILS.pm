@@ -50,6 +50,8 @@ sub requestitem {
 
 # Other methods, just because.
 
+# Handle a LookupVersion Request.  You probably want to just call this
+# one from your subclasses rather than reimplement it.
 sub lookupversion {
 }
 
@@ -62,9 +64,17 @@ sub lookupversion {
 # NCIP::Header.
 sub make_header {
     my $self = shift;
-    my $initheader = shfit;
+    my $request = shift;
 
+    my $initheader;
     my $header;
+
+    for my $key (keys %$request) {
+        if ($request->{$key}->{InitiationHeader}) {
+            $initheader = $request->{$key}->{InitiationHeader};
+            last;
+        }
+    }
 
     if ($initheader && $initheader->{FromAgencyId}
             && $initheader->{ToAgencyId}) {
