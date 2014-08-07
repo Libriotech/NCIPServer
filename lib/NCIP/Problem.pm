@@ -19,6 +19,13 @@
 package NCIP::Problem;
 use parent qw(Class::Accessor);
 
-NCIP::Problem->mk_accessors(qw(type scheme detail element value ext));
+# NCIP::Problem is the object used to report that a problem occurred
+# during message processing.  The fields are as defined in
+# Z39.83-1-2012.  Ext is avaialable for future use, but it is not
+# presently used by the problem template.  The obsolete
+# ProcessingError fields have been excluded.
+
+NCIP::Problem->mk_accessors(qw(ProblemType Scheme ProblemDetail ProblemElement
+                               ProblemValue Ext));
 
 1;

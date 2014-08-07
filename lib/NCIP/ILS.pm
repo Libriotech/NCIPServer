@@ -53,4 +53,28 @@ sub requestitem {
 sub lookupversion {
 }
 
+# A few helper methods:
+
+# All subclasses will possibly want to create a ResponseHeader and the
+# code for that would be highly redundant.  We supply a default
+# implementation here that can retrieve the agency information from
+# the InitiationHeader of the message, swap their values, and return a
+# NCIP::Header.
+sub make_header {
+    my $self = shift;
+    my $initheader = shfit;
+
+    my $header;
+
+    if ($initheader && $initheader->{FromAgencyId}
+            && $initheader->{ToAgencyId}) {
+        $header = NCIP::Header->new(
+            FromAgencyId => $initheader->{ToAgencyId},
+            ToAgencyId => $initheader->{FromAgencyId}
+        );
+    }
+
+    return $header;
+}
+
 1;
