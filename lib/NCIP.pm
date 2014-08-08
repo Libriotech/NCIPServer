@@ -36,7 +36,7 @@ sub new {
     $self->{namespace} = $config->('NCIP.namespace.value');
     Log::Log4perl->init($config_dir . "/log4perl.conf");
     # load the ILS dependent module
-    my $module = 'NCIP::ILS::' . $config->('NCIP.ils.value');
+    my $module = $config->('NCIP.ils.value');
     load $module || die "Can not load ILS module $module";
     my $ils = $module->new( name => $config->('NCIP.ils.value') );
     $self->{'ils'} = $ils;
