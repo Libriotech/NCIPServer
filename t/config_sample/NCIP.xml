@@ -33,7 +33,7 @@
   <version>
   </version>
 
-  <ils value='Koha' />
+  <ils value='NCIP::ILS' />
   <namespace value= 'http://www.niso.org/2008/ncip' />
   <templates value= 'templates/' />
 </acsconfig>
