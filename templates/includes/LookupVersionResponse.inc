@@ -1,5 +1,5 @@
-[% FOREACH version IN versions %]
+[% FOREACH version IN data.versions -%]
 <VersionSupported>
-[% version %]
+[%- version -%]
 </VersionSupported>
-[% END %]
+[% END -%]
