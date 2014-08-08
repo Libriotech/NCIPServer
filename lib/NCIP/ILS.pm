@@ -21,6 +21,7 @@ package NCIP::ILS;
 use Modern::Perl;
 use NCIP::Const;
 use NCIP::Header;
+use NCIP::Problem;
 use NCIP::Response;
 
 sub new {
@@ -33,24 +34,52 @@ sub new {
 # Methods required for SHAREit:
 
 sub acceptitem {
+    my $self = shift;
+    my $request = shift;
+
+    return $self->unsupportedservice($request);
 }
 
 sub cancelrequestitem {
+    my $self = shift;
+    my $request = shift;
+
+    return $self->unsupportedservice($request);
 }
 
 sub checkinitem {
+    my $self = shift;
+    my $request = shift;
+
+    return $self->unsupportedservice($request);
 }
 
 sub checkoutitem {
+    my $self = shift;
+    my $request = shift;
+
+    return $self->unsupportedservice($request);
 }
 
 sub lookupuser {
+    my $self = shift;
+    my $request = shift;
+
+    return $self->unsupportedservice($request);
 }
 
 sub renewitem {
+    my $self = shift;
+    my $request = shift;
+
+    return $self->unsupportedservice($request);
 }
 
 sub requestitem {
+    my $self = shift;
+    my $request = shift;
+
+    return $self->unsupportedservice($request);
 }
 
 # Other methods, just because.
@@ -72,6 +101,35 @@ sub lookupversion {
 }
 
 # A few helper methods:
+
+# This is a handy method that subclasses should probably not override.
+# It returns a response containing an Unsupported Service problem.  It
+# is used by NCIP.pm when the ILS cannot handle a message, or your
+# implementation could return this in the case of a service/message
+# you don't actually handle, though you may have the proper function
+# defined.
+sub unsupportedservice {
+    my $self = shift;
+    my $request = shift;
+
+    my $service;
+    for my $key (keys %$request) {
+        if (ref $request->{$key} eq 'HASH') {
+            $service = $key;
+            last;
+        }
+    }
+
+    my $response = NCIP::Response->new({type => $service . 'Response'});
+    my $problem = NCIP::Problem->new();
+    $problem->ProblemType('Unsupported Service');
+    $problem->ProblemDetail("$service service is not supported by this implementation.");
+    $problem->ProblemElement("NULL");
+    $problem->ProblemValue("Not Supported");
+    $response->problem($problem);
+
+    return $response;
+}
 
 # All subclasses will possibly want to create a ResponseHeader and the
 # code for that would be highly redundant.  We supply a default
