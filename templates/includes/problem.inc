@@ -1,14 +1,14 @@
 <Problem>
 <ProblemType>
-[% problem.ProblemType %]
+[% problem.ProblemType | xml %]
 </ProblemType>
 <ProblemDetail>
-[% problem.ProblemDetail %]
+[% problem.ProblemDetail | xml %]
 </ProblemDetail>
 <ProblemElement>
-[% problem.ProblemElement %]
+[% problem.ProblemElement | xml %]
 </ProblemElement>
 <ProblemValue>
-[% problem.ProblemValue %]
+[% problem.ProblemValue | xml %]
 </ProblemValue>
 </Problem>
