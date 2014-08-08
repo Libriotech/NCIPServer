@@ -112,13 +112,7 @@ sub unsupportedservice {
     my $self = shift;
     my $request = shift;
 
-    my $service;
-    for my $key (keys %$request) {
-        if (ref $request->{$key} eq 'HASH') {
-            $service = $key;
-            last;
-        }
-    }
+    my $service = $self->parse_request_type($request);
 
     my $response = NCIP::Response->new({type => $service . 'Response'});
     my $problem = NCIP::Problem->new();
@@ -143,13 +137,9 @@ sub make_header {
     my $initheader;
     my $header;
 
-    for my $key (keys %$request) {
-        if (ref $request->{$key} eq 'HASH'
-                && $request->{$key}->{InitiationHeader}) {
-            $initheader = $request->{$key}->{InitiationHeader};
-            last;
-        }
-    }
+    my $key = $self->parse_request_type($request);
+    $initheader = $request->{$key}->{InitiationHeader}
+        if ($key && $request->{$key}->{InitiationHeader});
 
     if ($initheader && $initheader->{FromAgencyId}
             && $initheader->{ToAgencyId}) {
@@ -160,6 +150,21 @@ sub make_header {
     }
 
     return $header;
+}
+
+sub parse_request_type {
+    my $self = shift;
+    my $request = shift;
+    my $type;
+
+    for my $key (keys %$request) {
+        if (ref $request->{$key} eq 'HASH') {
+            $type = $key;
+            last;
+        }
+    }
+
+    return $type;
 }
 
 1;
