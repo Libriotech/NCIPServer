@@ -1,14 +1,16 @@
 package NCIP;
 use NCIP::Configuration;
-use NCIP::Handler;
+use NCIP::Response;
+use NCIP::Problem;
 use Modern::Perl;
 use XML::LibXML;
+use XML::LibXML::Simple qw/XMLin/;
 use Try::Tiny;
 use Module::Load;
 use Template;
 use Log::Log4perl;
 
-use Object::Tiny qw{xmldoc config namespace ils};
+use Object::Tiny qw{config namespace ils};
 
 our $VERSION           = '0.01';
 our $strict_validation = 0;        # move to config file
@@ -46,31 +48,48 @@ sub new {
 
 =head2 process_request()
 
- my $response = $ncip->process_request($xml);
+ my $output = $ncip->process_request($xml);
 
 =cut
 
 sub process_request {
     my $self           = shift;
     my $xml            = shift;
-    my ($request_type) = $self->handle_initiation($xml);
-    unless ($request_type) {
 
-      # We have invalid xml, or we can't figure out what kind of request this is
-      # Handle error here
-#        warn "We can't find request type";
-        my $output = $self->_error("We can't find request type");
-        return $output;
-    }
-    my $handler = NCIP::Handler->new(
-        {
-            namespace    => $self->namespace(),
-            type         => $request_type,
-            ils          => $self->ils,
-            template_dir => $self->config->('NCIP.templates.value'),
+    # Declare our response object:
+    my $response;
+
+    # Make an object out of the XML request message:
+    my $request = $self->handle_initiation($xml);
+    if ($request) {
+        # Get the request type from the message:
+        my $type = $self->{ils}->parse_request_type($request);
+        if ($type) {
+            my $message = lc($type);
+            if ($self->{ils}->can($message)) {
+                $response = $self->{ils}->$message($request);
+            } else {
+                $response = $self->{ils}->unsupportedservice($request);
+            }
         }
-    );
-    return $handler->handle( $self->xmldoc );
+    }
+
+    # The ILS is responsible for handling internal errors, so we
+    # assume that not having a response object at this point means we
+    # got an invalid message sent to us, or it got garbled in
+    # transmission.
+    unless ($response) {
+        my $problem = NCIP::Problem->new();
+        $problem->ProblemType("Invalid Message Syntax Error");
+        $problem->ProblemDetail("Unable to parse the NCIP message.");
+        $problem->ProblemElement("NULL");
+        $problem->ProblemValue("Unable to parse the NCIP message.");
+        # Make a response and add our problem.
+        $response = NCIP::Response->new();
+        $response->problem($problem);
+    }
+
+    return $self->render_output($response);
 }
 
 =head2 handle_initiation
@@ -80,11 +99,13 @@ sub process_request {
 sub handle_initiation {
     my $self = shift;
     my $xml  = shift;
+
     my $dom;
     my $log = Log::Log4perl->get_logger("NCIP");
+
     eval { $dom = XML::LibXML->load_xml( string => $xml ); };
     if ($@) {
-        $log->info("Invalid xml we can not parse it ");        
+        $log->info("Invalid xml we can not parse it ");
     }
     if ($dom) {
 
@@ -97,13 +118,7 @@ sub handle_initiation {
             # throw/log error
             return;
         }
-        my $request_type = $self->parse_request($dom);
-
-        # do whatever we should do to initiate, then hand back request_type
-        if ($request_type) {
-            $self->{xmldoc} = $dom;
-            return $request_type;
-        }
+        return XMLin( $dom, NsStrip => 1, NormaliseSpace => 2 );
     }
     else {
         $log->info("We have no DOM");
@@ -132,38 +147,29 @@ sub validate {
     return 1;
 }
 
-sub parse_request {
-    my $self = shift;
-    my $dom  = shift;
-    my $nodes =
-      $dom->getElementsByTagNameNS( $self->namespace(), 'NCIPMessage' );
-    if ($nodes) {
-        my @childnodes = $nodes->[0]->childNodes();
-        if ( $childnodes[1] ) {
-            return $childnodes[1]->localname();
-        }
-        else {
-            warn "Got a node, but no child node";
-            return;
-        }
-    }
-    else {
-        warn "Invalid XML";
-        return;
-    }
-    return;
-}
+=head2 render_output
 
-sub _error {
+  my $output = $self->render_output($response);
+
+Accepts a NCIP::Response object and renders the response.tt template
+based on its input.  The template output is returned.
+
+=cut
+
+sub render_output {
     my $self         = shift;
-    my $error_detail = shift;
-    my $vars;
-    $vars->{'error_detail'} = $error_detail;
-    $vars->{'messagetype'} = 'ItemRequestedResponse'; # No idea what this type should be 
+    my $response = shift;
+
     my $template = Template->new(
-        { INCLUDE_PATH => $self->config->('NCIP.templates.value'), } );
+        {
+            INCLUDE_PATH => $self->config->('NCIP.templates.value'),
+            POST_CHOMP   => 1
+        }
+    );
+
     my $output;
-    $template->process( 'problem.tt', $vars, \$output );
+    $template->process( 'response.tt', $response, \$output );
     return $output;
 }
+
 1;
