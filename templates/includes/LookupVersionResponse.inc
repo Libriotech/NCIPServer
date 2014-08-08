@@ -1,5 +1,5 @@
 [% FOREACH version IN data.versions -%]
 <VersionSupported>
-[%- version -%]
+[%- version | xml -%]
 </VersionSupported>
 [% END -%]
