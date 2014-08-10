@@ -24,6 +24,25 @@ use NCIP::Header;
 use NCIP::Problem;
 use NCIP::Response;
 
+=head1 NAME
+
+NCIP::ILS - A base class for NIPServer ILS drivers.
+
+=head1 SYNOPSIS
+
+C<use NCIP::ILS;>
+
+C<my $ils = NCIP::ILS-E<gt>new(name =E<gt> $config-E<gt>{NCIP.ils.value});>
+
+=head1 DESCRIPTION
+
+NCIP::ILS is meant as a base class and test implementation of the ILS
+specific drivers of NCIPServer.  If you wish to implement a driver for
+your specific ILS, then it is recommended you subclass this module and
+reimplement the methods as necessary.
+
+=cut
+
 sub new {
     my $invocant = shift;
     my $class = ref $invocant || $invocant;
@@ -31,7 +50,34 @@ sub new {
     return $self;
 }
 
+=head1 HANDLER METHODS
+
+When NCIPServer receives an incoming message, it translates the
+requested service into lower case and then checks if the ILS has a
+method by that name.  If it does that method is called with a single
+argument consisting of the XML request converted to a hash ref via
+XML::LibXML::Simple.  If the ILS does not support that service, then
+the unsupportedservice method of the ILS is called and the resulting
+problem response returned to the client.
+
+All handler methods must return a NCIP::Response object.
+
+The handler methods provided in this base class implementation are
+those that were required for the initial implemenation of NCIPServer
+to be used with a particular initiator software.  You may add any
+additional handlers to your implementation as required without needing
+to alter this base class.
+
+=cut
+
 # Methods required for SHAREit:
+
+=head2 acceptitem
+
+Called to handle the AcceptItem service request.  The inherited
+implementation returns the Unsupported Service problem response.
+
+=cut
 
 sub acceptitem {
     my $self = shift;
@@ -40,12 +86,26 @@ sub acceptitem {
     return $self->unsupportedservice($request);
 }
 
+=head2 cancelrequestitem
+
+Called to handle the CancelRequestItem service request.  The inherited
+implementation returns the Unsupported Service problem response.
+
+=cut
+
 sub cancelrequestitem {
     my $self = shift;
     my $request = shift;
 
     return $self->unsupportedservice($request);
 }
+
+=head2 checkinitem
+
+Called to handle the CheckInItem service request.  The inherited
+implementation returns the Unsupported Service problem response.
+
+=cut
 
 sub checkinitem {
     my $self = shift;
@@ -54,12 +114,26 @@ sub checkinitem {
     return $self->unsupportedservice($request);
 }
 
+=head2 checkoutitem
+
+Called to handle the CheckOutItem service request.  The inherited
+implementation returns the Unsupported Service problem response.
+
+=cut
+
 sub checkoutitem {
     my $self = shift;
     my $request = shift;
 
     return $self->unsupportedservice($request);
 }
+
+=head2 lookupuser
+
+Called to handle the LookupUser service request.  The inherited
+implementation returns the Unsupported Service problem response.
+
+=cut
 
 sub lookupuser {
     my $self = shift;
@@ -68,12 +142,26 @@ sub lookupuser {
     return $self->unsupportedservice($request);
 }
 
+=head2 renewitem
+
+Called to handle the RenewItem service request.  The inherited
+implementation returns the Unsupported Service problem response.
+
+=cut
+
 sub renewitem {
     my $self = shift;
     my $request = shift;
 
     return $self->unsupportedservice($request);
 }
+
+=head2 requestitem
+
+Called to handle the RequestItem service request.  The inherited
+implementation returns the Unsupported Service problem response.
+
+=cut
 
 sub requestitem {
     my $self = shift;
@@ -84,8 +172,15 @@ sub requestitem {
 
 # Other methods, just because.
 
-# Handle a LookupVersion Request.  You probably want to just call this
-# one from your subclasses rather than reimplement it.
+=head2 lookupversion
+
+Called to handle the LookupVersion service request.  The inherited
+implementation returns the list of supported versions from
+NCIP::Const.  You probably do not want to reimplement this method in
+your subclass.
+
+=cut
+
 sub lookupversion {
     my $self = shift;
     my $request = shift;
@@ -100,14 +195,28 @@ sub lookupversion {
     return $response;
 }
 
-# A few helper methods:
+=head1 USEFUL METHODS
 
-# This is a handy method that subclasses should probably not override.
-# It returns a response containing an Unsupported Service problem.  It
-# is used by NCIP.pm when the ILS cannot handle a message, or your
-# implementation could return this in the case of a service/message
-# you don't actually handle, though you may have the proper function
-# defined.
+These are methods of the base class that you may want to use in your
+subclass or that are used by NCIPserver or other methods of this base
+class.  You very likely do not want to override these in your
+subclass.
+
+=cut
+
+=head2 unsupportedservice
+
+C<my $response = $ils-E<gt>unsupportedservice($request);>
+
+This method has the same signature as a regular service handler
+method.  It returns a response containing an Unsupported Service
+problem.  It is used by NCIP.pm when the ILS cannot handle a message,
+or your implementation could return this in the case of a
+service/message you don't actually handle, though you may have the
+proper function defined.
+
+=cut
+
 sub unsupportedservice {
     my $self = shift;
     my $request = shift;
@@ -125,11 +234,20 @@ sub unsupportedservice {
     return $response;
 }
 
-# All subclasses will possibly want to create a ResponseHeader and the
-# code for that would be highly redundant.  We supply a default
-# implementation here that can retrieve the agency information from
-# the InitiationHeader of the message, swap their values, and return a
-# NCIP::Header.
+=head2 make_header
+
+C<$response-E<gt>header($ils-E<gt>make_header($request));>
+
+All subclasses will possibly want to create a ResponseHeader for the
+response message.  Since the code for that could be highly redundant
+if reimplemented by each subclass, the base class supplies an
+implementation that retrieves the agency information from the
+InitiationHeader of the request message, swaps the FromAgencyId with
+the ToAgencyId, and vice versa.  It then returns a NCIP::Header to be
+used in the NCIP::Response object's header field.
+
+=cut
+
 sub make_header {
     my $self = shift;
     my $request = shift;
@@ -151,6 +269,19 @@ sub make_header {
 
     return $header;
 }
+
+=head2 parse_request_type
+
+C<my $type = $ils-E<gt>parse_request_type($request);>
+
+Given the request hashref object, parse_request_type will return the
+service being requested in the message.  This method is called by
+NCIP.pm in order to determine which handler of the ILS object to call.
+You may find it convenient to use this method in your own handler
+implementations.  You should not need to override this method in your
+subclass.
+
+=cut
 
 sub parse_request_type {
     my $self = shift;
