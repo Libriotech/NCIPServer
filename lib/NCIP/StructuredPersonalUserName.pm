@@ -16,13 +16,16 @@
 # You should have received a copy of the GNU General Public License
 # along with NCIPServer.  If not, see <http://www.gnu.org/licenses/>.
 # ---------------------------------------------------------------
-package NCIP::User;
+package NCIP::StructuredPersonalUserName;
 
-use parent qw(Class::Accessor);
+use parent qw(Class:Accessor);
+
+# The name of this class is a bit unwieldy, but comes directly from
+# the standard.  I wonder if we shouldn't rename for our own sanity.
 
 =head1 NAME
 
-User - An object for user information
+StructuredPersonalUserName - Object to hold name information
 
 =head1 SYNOPSIS
 
@@ -32,14 +35,36 @@ User - An object for user information
 
 =head1 FIELDS
 
-=head2 UserId
+The fields are text strings.
 
-=head2 UserOptionalFields
+=head2 Prefix
+
+Optional field to hold the user's name prefix.
+
+=head2 GivenName
+
+Optional field to hold the user's given, or first, name.
+
+=head2 Surname
+
+Required field to hold the user's surname. This is the user's family
+name.
+
+This field is required by the standard and also so the code may tell
+the difference from an unstructured name if we ever support it.
+
+=head2 Initials
+
+Optional field for the user's name initials.
+
+=head2 Suffix
+
+Optional field for the user's name suffix, if any.
 
 =cut
 
-
-# Make accessors for the ones that makes sense
-NCIP::User->mk_accessors(qw(UserId UserOptionalFields));
+NCIP::StructuredPersonalUserName->mk_accessors(
+    qw(Prefix GivenName Surname Initials Suffix)
+);
 
 1;

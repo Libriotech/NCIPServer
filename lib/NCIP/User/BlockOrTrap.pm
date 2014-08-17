@@ -16,13 +16,13 @@
 # You should have received a copy of the GNU General Public License
 # along with NCIPServer.  If not, see <http://www.gnu.org/licenses/>.
 # ---------------------------------------------------------------
-package NCIP::User;
+package NCIP::User::BlockOrTrap;
 
 use parent qw(Class::Accessor);
 
 =head1 NAME
 
-User - An object for user information
+BlockOrTrap - as defined in Z39.83-1-2012
 
 =head1 SYNOPSIS
 
@@ -32,14 +32,23 @@ User - An object for user information
 
 =head1 FIELDS
 
-=head2 UserId
+=head2 AgencyId
 
-=head2 UserOptionalFields
+=head2 BlockOrTrapType
+
+=head2 ValidFromDate
+
+=head2 ValidToDate
 
 =cut
 
-
-# Make accessors for the ones that makes sense
-NCIP::User->mk_accessors(qw(UserId UserOptionalFields));
+NCIP::User::BlockOrTrap->mk_accessors(
+    qw(
+          AgencyId
+          BlockOrTrapType
+          ValidFromDate
+          ValidToDate
+      )
+);
 
 1;

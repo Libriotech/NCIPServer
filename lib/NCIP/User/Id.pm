@@ -16,13 +16,13 @@
 # You should have received a copy of the GNU General Public License
 # along with NCIPServer.  If not, see <http://www.gnu.org/licenses/>.
 # ---------------------------------------------------------------
-package NCIP::User;
+package NCIP::User::Id;
 
 use parent qw(Class::Accessor);
 
 =head1 NAME
 
-User - An object for user information
+Id - 
 
 =head1 SYNOPSIS
 
@@ -32,14 +32,15 @@ User - An object for user information
 
 =head1 FIELDS
 
-=head2 UserId
+=head2 AgencyId
 
-=head2 UserOptionalFields
+=head2 UserIdentifierType
+
+=head2 UserIdentifierValue
 
 =cut
 
-
-# Make accessors for the ones that makes sense
-NCIP::User->mk_accessors(qw(UserId UserOptionalFields));
+NCIP::User::Id->mk_accessors(qw(AgencyId UserIdentifierType
+                                UserIdentifierValue));
 
 1;

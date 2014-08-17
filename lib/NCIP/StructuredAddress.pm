@@ -19,11 +19,50 @@
 package NCIP::StructuredAddress;
 use parent qw(Class::Accessor);
 
-# This a "StructuredAddress" as defined by Z39.83-1-2012.  It is used
-# for returning user address information when requested.  The fields
-# are as defined in the standard.
 
-NCIP::StructuredAddress->mk_accessors(qw(line1 line2 locality region postalcode
-                                         country));
+=head1 NAME
+
+StructuredAddress - A "StructuredAddress" as defined by Z39.83-1-2012
+
+=head1 SYNOPSIS
+
+
+
+=head1 DESCRIPTION
+
+This a "StructuredAddress" as defined by Z39.83-1-2012.  It is used
+for returning user address information when requested.  The fields
+are as defined in the standard.
+
+=head1 FIELDS
+
+=head2 Line1
+
+First line of the address.
+
+=head2 Line2
+
+Second line of the address.
+
+=head2 Locality
+
+Locality of the address, typically a city.
+
+=head2 Region
+
+Region of the address, typically a state, province, or department.
+
+=head2 PostalCode
+
+The postal (or zip) code of the address.
+
+=head2 Country
+
+The country of the address.
+
+=cut
+
+NCIP::StructuredAddress->mk_accessors(qw(Line1 Line2 Locality Region PostalCode
+                                         Country));
 
 1;
