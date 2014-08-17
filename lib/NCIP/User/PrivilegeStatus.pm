@@ -22,7 +22,7 @@ use parent qw(Class::Accessor);
 
 =head1 NAME
 
-PrivilegeStatus -
+PrivilegeStatus - UserPrivilegeStatus as defined in Z39.83-1-2012.
 
 =head1 SYNOPSIS
 
@@ -34,7 +34,12 @@ PrivilegeStatus -
 
 =head2 UserPrivilegeStatusType
 
+Text string for the status type, i.e. active, inactive, expired, for
+the privilege.
+
 =head2 DateOfUserPrivilegeStatus
+
+Optional date that the privilege entered the given status.
 
 =cut
 

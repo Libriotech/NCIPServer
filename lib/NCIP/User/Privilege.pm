@@ -22,7 +22,7 @@ use parent qw(Class::Accessor);
 
 =head1 NAME
 
-Privilege -
+Privilege - UserPrivilege as defined in Z39.83-1-2012
 
 =head1 SYNOPSIS
 
@@ -34,15 +34,27 @@ Privilege -
 
 =head2 AgencyId
 
+Text string with the agency identifier where the privilege originates.
+
 =head2 AgencyUserPrivilegeType
+
+Text string with the type of the privilege.
 
 =head2 ValidFromDate
 
+Optional start date for the privilege.
+
 =head2 ValidToDate
+
+Optional end date for the privilege.
 
 =head2 UserPrivilegeStatus
 
+Optional NCIP::User::PrivilegeStatus object.
+
 =head2 UserPrivilegeDescription
+
+Optional text string describing the privilege.
 
 =cut
 

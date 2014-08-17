@@ -22,7 +22,7 @@ use parent qw(Class::Accessor);
 
 =head1 NAME
 
-Id -
+Id - UserId obeject as defined in Z39.83-1-2012.
 
 =head1 SYNOPSIS
 
@@ -34,9 +34,15 @@ Id -
 
 =head2 AgencyId
 
+Text string with the Agency ID.
+
 =head2 UserIdentifierType
 
+Text string with the type of user identifier, i.e. barcode, database id.
+
 =head2 UserIdentifierValue
+
+Text string with the value of the user identifer.
 
 =cut
 
