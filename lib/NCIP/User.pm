@@ -34,7 +34,11 @@ User - An object for user information
 
 =head2 UserId
 
+An array ref of NCIP::User::Id objects.
+
 =head2 UserOptionalFields
+
+A single NCIP::User::OptionalFields object.
 
 =cut
 

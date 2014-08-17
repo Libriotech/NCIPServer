@@ -1,18 +1,20 @@
+[% FOREACH id IN data.UserId -%]
 <UserId>
 <UserIdentifierValue>
-[% data.UserId.UserIdentifierValue | xml %]
+[% id.UserIdentifierValue | xml %]
 </UserIdentifierValue>
-[% IF data.UserId.UserIdentifierType -%]
+[% IF id.UserIdentifierType -%]
 <UserIdentifierType>
-[% data.UserId.UserIdentifierType | xml %]
+[% id.UserIdentifierType | xml %]
 </UserIdentifierType>
 [% END -%]
-[% IF data.UserId.AgencyId -%]
+[% IF id.AgencyId -%]
 <AgencyId>
-[% data.UserId.AgencyId %]
+[% id.AgencyId %]
 </AgencyId>
 [% END -%]
 </UserId>
+[% END -%]
 [% IF data.UserOptionalFields -%]
 <UserOptionalFields>
   [% IF data.UserOptionalFields.NameInformation -%]
