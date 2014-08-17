@@ -19,27 +19,49 @@
 package NCIP::Response;
 use parent qw(Class::Accessor);
 
-# This is the Response object to be returned by the ILS' handlers.
-# The fields are:
-#
-# type: A string representing the name of the response this is usually
-# the initiation message name with Response tacked on, i.e.
-# LookupUserResponse, etc.  This value is used to lookup the
-# appropriate template include for formatting the response message to
-# the initiator.
-#
-# data: This is an object or struct with the response data for a
-# successful result.  It's value and needs vary by message type.
-#
-# problem: If the response is reporting a problem, this should point
-# to a NCIP::Problem object to be used in the problem template.
-#
-# header: A NCIP::Header object for the optional ResponseHeader in the
-# response template.
+=head1 NAME
 
-# Presently, only one data or problem object is supported.  If one is
-# supplied the other must be left undefined/unset.  Only 1 header is
-# supported, but it is entirely optional according to the standard.
+Response - Response object to be returned from ILS' handlers.
+
+=head1 SYNOPSIS
+
+
+
+=head1 DESCRIPTION
+
+This is the Response object to be returned by the ILS' handlers.
+
+=head1 FIELDS
+
+Presently, only one data or problem object is supported.  If one is
+supplied the other must be left undefined/unset.  Only 1 header is
+supported, but it is entirely optional according to the standard.
+
+=head2 type
+
+A string representing the name of the response this is usually the
+initiation message name with Response tacked on, i.e.
+LookupUserResponse, etc.  This value is used to lookup the appropriate
+template for formatting the response message to the initiator.
+
+=head2 data
+
+This is an object or struct with the response data for a successful
+result.  It's value and needs vary by message type.
+
+=head2 problem
+
+If the response is reporting a problem, this should point to a
+NCIP::Problem object to be used in the problem template.
+
+=head2 header
+
+A NCIP::Header object for the optional ResponseHeader in the response
+template.
+
+
+=cut
+
 
 NCIP::Response->mk_accessors(qw(type data problem header));
 
