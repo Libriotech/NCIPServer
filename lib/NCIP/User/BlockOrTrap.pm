@@ -34,11 +34,19 @@ BlockOrTrap - as defined in Z39.83-1-2012
 
 =head2 AgencyId
 
+Text string with the agency identifier for the block or trap.
+
 =head2 BlockOrTrapType
+
+The type of block or trap, i.e. block checkout, block holds....
 
 =head2 ValidFromDate
 
+Optional date that the block starts.
+
 =head2 ValidToDate
+
+Optional date that the block ends.
 
 =cut
 
