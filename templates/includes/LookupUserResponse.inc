@@ -39,7 +39,8 @@
 [% IF data.UserOptionalFields.UserAddressInformation -%]
   [% FOREACH element IN data.UserOptionalFields.UserAddressInformation -%]
      <UserAddressInformation>
-      <UserAddressRoleType>[% element.AddressRoleType %]</UserAddressRoleType>
+     <UserAddressRoleType>[% element.AddressRoleType | xml %]</UserAddressRoleType>
+     [% IF element.PhysicalAddress -%]
      <PhysicalAddress>
        <StructuredAddress>
        <Line1>[% element.PhysicalAddress.Line1 | xml %]</Line1>
@@ -60,6 +61,12 @@
        [% END -%]
        </StructuredAddress>
      </PhysicalAddress>
+     [% ELSIF element.ElectronicAddress -%]
+     <ElectronicAddress>
+       <ElectronicAddressType>[% element.ElectronicAddress.Type | xml %]</ElectronicAddressType>
+       <ElectronicAddressData>[% element.ElectronicAddress.Data | xml %]</ElectronicAddressData>
+     </ElectronicAddress>
+     [% END -%]
      </UserAddressInformation>
   [% END -%]
 [% END -%]
