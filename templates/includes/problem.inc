@@ -1,5 +1,9 @@
 <Problem>
+[% IF problem.Scheme -%]
+<ProblemType Scheme="[% problem.Scheme | xml %]">
+[% ELSE -%]
 <ProblemType>
+[% END -%]
 [% problem.ProblemType | xml %]
 </ProblemType>
 <ProblemDetail>
