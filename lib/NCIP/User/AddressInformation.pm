@@ -16,13 +16,13 @@
 # You should have received a copy of the GNU General Public License
 # along with NCIPServer.  If not, see <http://www.gnu.org/licenses/>.
 # ---------------------------------------------------------------
-package NCIP::User;
+package NCIP::User::AddressInformation;
 
 use parent qw(Class::Accessor);
 
 =head1 NAME
 
-User - An object for user information
+AddressInformation - A user's Address Information
 
 =head1 SYNOPSIS
 
@@ -32,14 +32,18 @@ User - An object for user information
 
 =head1 FIELDS
 
-=head2 UserId
+=head2 UserAddressRoleType
 
-=head2 UserOptionalFields
+A text string to indicate the role of the address.
+
+=head2 PhysicalAddress
+
+A physical address stored in a StructuredAddress.
 
 =cut
 
-
-# Make accessors for the ones that makes sense
-NCIP::User->mk_accessors(qw(UserId UserOptionalFields));
+NCIP::User::AddressInformation->mk_accessors(
+    qw(UserAddressRoleType PhysicalAddress)
+);
 
 1;

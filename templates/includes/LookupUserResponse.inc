@@ -1,49 +1,115 @@
-
 <UserId>
-<UserIdentifierValue>[% user.userdata.cardnumber | xml %]</UserIdentifierValue>
+<UserIdentifierValue>
+[% data.UserId.UserIdentifierValue | xml %]
+</UserIdentifierValue>
+[% IF data.UserId.UserIdentifierType -%]
+<UserIdentifierType>
+[% data.UserId.UserIdentifierType | xml %]
+</UserIdentifierType>
+[% END -%]
+[% IF data.UserId.AgencyId -%]
+<AgencyId>
+[% data.UserId.AgencyId %]
+</AgencyId>
+[% END -%]
 </UserId>
-[%# <UserFiscalAccount></UserFiscalAccount>
-LoanedItemsCount
-LoanedItem
-RequestedItemsCount
-RequestedItem
-%]
+[% IF data.UserOptionalFields -%]
 <UserOptionalFields>
-[% FOREACH element IN elements %]
-  [% IF element.textContent == 'User Address Information' %]
-     <UserAddressInformation>
-      <UserAddressRoleType>Primary Address</UserAddressRoleType>
-     <PhysicalAddress>
-       <StructuredAddress>
-       <Line1>[% user.userdata.streetnumber | xml %] [% user.userdata.address | xml %]</Line1>
-       [% IF user.userdata.address2 %]
-       <Line2>[% user.userdata.address2 | xml %]</Line2>
-       [% END %]
-       [% IF user.userdata.city %]
-       <Locality>[% user.userdata.city | xml %]</Locality>
-       [% END %]
-       [% IF user.userdata.state %]
-       <Region>[% user.userdata.state | xml %]</Region>
-       [% END %]
-       [% IF user.userdata.zipcode %]
-       <PostalCode>[% user.userdata.zipcode | xml %]</PostalCode>
-       [% END %]
-       [% IF user.userdata.country %]
-       <Country>[% user.userdata.country | xml %]</Country>
-       [% END %]
-       </StructuredAddress>
-     </PhysicalAddress>
-     </UserAddressInformation>
-  [% END %]
-  [% IF element.textContent == 'Name Information' %]
+  [% IF data.UserOptionalFields.NameInformation -%]
     <NameInformation>
       <PersonalNameInformation>
         <StructuredPersonalUserName>
-          <GivenName>[% user.userdata.firstname | xml %]</GivenName>
-          <Surname>[% user.userdata.surname | xml %]</Surname>
+	[% IF data.UserOptionalFields.NameInformation.GivenName -%]
+          <GivenName>[% data.UserOptionalFields.NameInformation.GivenName | xml %]</GivenName>
+	[% END -%]
+          <Surname>[% data.UserOptionalFields.NameInformation.Surname | xml %]</Surname>
+	[% IF data.UserOptionalFields.NameInformation.Prefix -%]
+	  <Prefix>[% data.UserOptionalFields.NameInformation.Prefix %]</Prefix>
+        [% END -%]
+	[% IF data.UserOptionalFields.NameInformation.Suffix -%]
+	  <Suffix>[% data.UserOptionalFields.NameInformation.Suffix %]</Suffix>
+        [% END -%]
+	[% IF data.UserOptionalFields.NameInformation.Initials -%]
+	  <Initials>[% data.UserOptionalFields.NameInformation.Initials %]</Initials>
+        [% END -%]
         </StructuredPersonalUserName>
       </PersonalNameInformation>
     </NameInformation>
-  [% END %]
-[% END %]
+  [% END -%]
+[% IF data.UserOptionalFields.UserAddressInformation -%]
+  [% FOREACH element IN data.UserOptionalFields.UserAddressInformation -%]
+     <UserAddressInformation>
+      <UserAddressRoleType>[% element.AddressRoleType %]</UserAddressRoleType>
+     <PhysicalAddress>
+       <StructuredAddress>
+       <Line1>[% element.PhysicalAddress.Line1 | xml %]</Line1>
+       [% IF element.PhysicalAddress.Line2 -%]
+       <Line2>[% element.PhysicalAddress.Line2 | xml %]</Line2>
+       [% END -%]
+       [% IF element.PhysicalAddress.Locality -%]
+       <Locality>[% element.PhysicalAddress.Locality | xml %]</Locality>
+       [% END -%]
+       [% IF element.PhysicalAddress.Region -%]
+       <Region>[% element.PhysicalAddress.Region | xml %]</Region>
+       [% END -%]
+       [% IF element.PhysicalAddress.PostalCode -%]
+       <PostalCode>[% element.PhysicalAddress.PostalCode | xml %]</PostalCode>
+       [% END -%]
+       [% IF element.PhysicalAddress.Country -%]
+       <Country>[% element.PhysicalAddress.Country | xml %]</Country>
+       [% END -%]
+       </StructuredAddress>
+     </PhysicalAddress>
+     </UserAddressInformation>
+  [% END -%]
+[% END -%]
+[% IF data.UserOptionalFields.UserPrivilege -%]
+[% FOREACH privilege IN data.UserOptionalFields.UserPrivilege -%]
+    <UserPrivilege>
+        <AgencyId>[% privilege.AgencyId | xml -%]</AgencyId>
+        <AgencyUserPrivilegeType>[% privilege.AgencyUserPrivilegeType | xml %]</AgencyUserPrivilegeType>
+	[% IF privilege.ValidFromDate -%]
+        <ValidFromDate>[% privilege.ValidFromDate | xml %]</ValidFromDate>
+	[% END -%]
+	[% IF privilege.ValidToDate -%]
+        <ValidToDate>[% privilege.ValidToDate | xml %]</ValidToDate>
+	[% END -%]
+	[% IF privilege.UserPrivilegeDescription -%]
+        <UserPrivilegeDescription>[% privilege.UserPrivilegeDescription | xml %]</UserPrivilegeDescription>
+	[% END -%]
+	[% IF privilege.UserPrivilegeStatus -%]
+	<UserPrivilegeStatus>
+	<UserPrivilegeStatusType>
+	[% privilege.UserPrivilegeStatus.UserPrivilegeStatusType | xml %]
+	</UserPrivilegeStatusType>
+	[% IF privilege.UserPrivilegeStatus.DateOfUserPrivilegeStatus -%]
+	<DateOfUserPrivilegeStatus>
+	[% privilege.UserPrivilegeStatus.DateOfUserPrivilegeStatus | xml %]
+	</DateOfUserPrivilegeStatus>
+	[% END -%]
+	</UserPrivilegeStatus>
+	[% END -%]
+    </UserPrivilege>
+[% END -%]
+[% END -%]
+[% IF data.UserOptionalFields.UserLanguage -%]
+[% FOREACH language IN data.UserOptionalFields.UserLanguage -%]
+    <UserLanguage>[% language | xml %]</UserLanguage>
+[% END -%]
+[% END -%]
+[% IF data.UserOptionalFields.BlockOrTrap -%]
+[% FOREACH block IN data.UserOptionalFields.BlockOrTrap -%]
+    <BlockOrTrap>
+    <AgencyId>[% block.AgencyId | xml %]</AgencyId>
+    <BlockOrTrapType>[% block.BlockOrTrapType | xml %]</BlockOrTrapType>
+    [% IF block.ValidFromDate -%]
+    <ValidFromDate>[% block.ValidFromDate %]</ValidFromDate>
+    [% END -%]
+    [% IF block.ValidToDate -%]
+    <ValidToDate>[% block.ValidToDate %]</ValidToDate>
+    [% END %]
+    </BlockOrTrap>
+[% END -%]
+[% END -%]
 </UserOptionalFields>
+[% END -%]
