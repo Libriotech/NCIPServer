@@ -34,7 +34,7 @@ Id - UserId obeject as defined in Z39.83-1-2012.
 
 =head2 AgencyId
 
-Text string with the Agency ID.
+Optional text string with the Agency ID.
 
 =head2 UserIdentifierType
 
