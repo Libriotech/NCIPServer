@@ -1,20 +1,24 @@
 # ---------------------------------------------------------------
-# Copyright © 2014 Jason Stephenson <jason@sigio.com>
+# Copyright © 2014 Jason J.A. Stephenson <jason@sigio.com>
 #
-# This program is free software; you can redistribute it and/or modify
+# This file is part of NCIPServer.
+#
+# NCIPServer is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation; either version 2 of the License, or
 # (at your option) any later version.
 #
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
+# NCIPServer is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with NCIPServer.  If not, see <http://www.gnu.org/licenses/>.
 # ---------------------------------------------------------------
 package NCIP::ILS::Evergreen;
 
 use Modern::Perl;
-use Object::Tiny qw/name/;
 use XML::LibXML::Simple qw(XMLin);
 use DateTime;
 use DateTime::Format::ISO8601;
@@ -29,6 +33,23 @@ use OpenILS::Const qw/:const/;
 use MARC::Record;
 use MARC::Field;
 use MARC::File::XML;
+
+# We need a bunch of NCIP::* objects.
+use NCIP::Response;
+use NCIP::Problem;
+use NCIP::User;
+use NCIP::User::OptionalFields;
+use NCIP::User::AddressInformation;
+use NCIP::User::Id;
+use NCIP::User::BlockOrTrap;
+use NCIP::User::Privilege;
+use NCIP::User::PrivilegeStatus;
+use NCIP::StructuredPersonalUserName;
+use NCIP::StructuredAddress;
+use NCIP::ElectronicAddress;
+
+# Inherit from NCIP::ILS.
+use parent qw(NCIP::ILS);
 
 # Default values we define for things that might be missing in our
 # runtime environment or configuration file that absolutely must have
@@ -56,8 +77,8 @@ sub new {
     my $class = shift;
     $class = ref $class or $class;
 
-    # Instantiate our Object::Tiny parent with the rest of the
-    # arguments.  It creates a blessed hashref.
+    # Instantiate our parent with the rest of the arguments.  It
+    # creates a blessed hashref.
     my $self = $class->SUPER::new(@_);
 
     # Look for our configuration file, load, and parse it:
@@ -72,112 +93,220 @@ sub new {
     return $self;
 }
 
-# Subroutines required by the NCIPServer interface:
-sub itemdata {}
-
-sub userdata {
+sub lookupuser {
     my $self = shift;
-    my $barcode = shift;
+    my $request = shift;
 
     # Check our session and login if necessary.
     $self->login() unless ($self->checkauth());
 
-    # Initialize the hashref we need to return to the caller.
-    my $userdata = {
-        borrowernumber => '',
-        cardnumber => '',
-        streetnumber => '',
-        address => '',
-        address2 => '',
-        city => '',
-        state => '',
-        zipcode => '',
-        country => '',
-        firstname => '',
-        surname => '',
-        blocked => ''
-    };
+    my $message_type = $self->parse_request_type($request);
+
+    # Let's go ahead and create our response object. We need this even
+    # if there is a problem.
+    my $response = NCIP::Response->new({type => $message_type . "Response"});
+    $response->header($self->make_header($request));
+
+    # Need to parse the request object to get the barcode and other
+    # data out.
+    my $barcode = $self->find_barcode($request);
+
+    # If we can't find a barcode, report a problem.
+    unless ($barcode) {
+        # Fill in a problem object and stuff it in the response.
+        my $problem = NCIP::Problem->new();
+        $problem->ProblemType('Needed Data Missing');
+        $problem->ProblemDetail('Cannot find user barcode in message.');
+        $problem->ProblemElement('AuthenticationInputType');
+        $problem->ProblemValue('Barcode');
+        $response->problem($problem);
+        return $response;
+    }
 
     # Look up our patron by barcode:
     my $user = $U->simplereq(
         'open-ils.actor',
         'open-ils.actor.user.fleshed.retrieve_by_barcode',
+        $self->{session}->{authtoken},
         $barcode,
         0
     );
 
     # Check for a failure, or a deleted, inactive, or expired user,
     # and if so, return empty userdata.
-    if (!$user || $U->event_code($user) || $user->deleted() || !$user->active()
-            || _expired($user) || !$user->card()->active()) {
-        # We'll return the empty userdata hashref to indicate a patron
-        # was not found.
-        return ($userdata, 'Borrower not found');
-    }
+    if (!$user || $U->event_code($user) || $U->is_true($user->deleted())
+            || !grep {$_->barcode() eq $barcode && $U->is_true($_->active())} @{$user->cards()}) {
 
-    # We also need to check if the barcode used to retrieve the patron
-    # is an active barcode.
-    if (!grep {$_->barcode() eq $barcode && $_->active()} @{$user->cards()}) {
-        return ($userdata, 'Borrower not found');
+        my $problem = NCIP::Problem->new();
+        $problem->ProblemType('Unknown User');
+        $problem->ProblemDetail("User with barcode $barcode unknown");
+        $problem->ProblemElement('AuthenticationInputData');
+        $problem->ProblemValue($barcode);
+        return $response;
     }
 
     # We got the information, so lets fill in our userdata.
-    $userdata->{borrowernumber} = $user->id();
-    $userdata->{cardnumber} = $user->card()->barcode();
-    $userdata->{firstname} = $user->first_given_name();
-    $userdata->{surname} = $user->family_name();
-    # Use the first address in the array that is valid and not
-    # pending, since no one said whether or not to use billing or
-    # mailing address.
-    my @addrs = grep {$_->valid() && !$_->pending()} @{$user->addresses()};
-    if (@addrs) {
-        $userdata->{city} = $addrs[0]->city();
-        $userdata->{country} = $addrs[0]->country();
-        $userdata->{zipcode} = $addrs[0]->post_code();
-        $userdata->{state} = $addrs[0]->state();
-        $userdata->{address} = $addrs[0]->street1();
-        $userdata->{address2} = $addrs[0]->street2();
-    }
+    my $userdata = NCIP::User->new();
 
-    # Check for barred patron.
-    if ($user->barred()) {
-        $userdata->{blocked} = "Patron account barred.";
-    }
-
-    # Check if the patron's profile is blocked from ILL.
-    if (!$userdata->{blocked} &&
-            grep {$_->id() == $user->profile()} @{$self->{block_profiles}}) {
-        $userdata->{blocked} = "Patron group blocked from ILL.";
-    }
-
-    # Check for penalties that block CIRC, HOLD, or RENEW.
-    unless ($userdata->{blocked}) {
-        foreach my $penalty (@{$user->standing_penalties()}) {
-            if ($penalty->standing_penalty->block_list()) {
-                my @blocks = split /\|/,
-                    $penalty->standing_penalty->block_list();
-                if (grep /(?:CIRC|HOLD|RENEW)/, @blocks) {
-                    $userdata->{blocked} = $penalty->standing_penalty->label();
-                    last;
-                }
-            }
+    # Make an array of the user's active barcodes.
+    my $ids = [];
+    foreach my $card (@{$user->cards()}) {
+        if ($U->is_true($card->active())) {
+            my $id = NCIP::User::Id->new({
+                UserIdentifierType => 'Barcode',
+                UserIdentifierValue => $card->barcode()
+            });
+            push(@$ids, $id);
         }
     }
+    $userdata->UserId($ids);
 
-    return ($userdata, $userdata->{blocked});
+    # Check if they requested any optional fields and return those.
+    my $elements = $request->{$message_type}->{UserElementType};
+    if ($elements) {
+        $elements = [$elements] unless (ref $elements eq 'ARRAY');
+        my $optionalfields = NCIP::User::OptionalFields->new();
+
+        # First, we'll look for name information.
+        if (grep {$_ eq 'Name Information'} @$elements) {
+            my $name = NCIP::StructuredPersonalUserName->new();
+            $name->Surname($user->given_name());
+            $name->GivenName($user->first_given_name());
+            $name->Prefix($user->prefix());
+            $name->Suffix($user->suffix());
+            $optionalfields->NameInformation($name);
+        }
+
+        # Next, check for user address information.
+        if (grep {$_ eq 'User Address Information'} @$elements) {
+            my $addresses = [];
+
+            # See if the user has any valid, physcial addresses.
+            foreach my $addr (@{$user->addresses()}) {
+                next if ($U->is_true($addr->pending()));
+                my $address = NCIP::User::AddressInformation->new({UserAddressRoleType=>$addr->address_type()});
+                my $physical = NCIP::StructuredAddress->new();
+                $physical->Line1($addr->street1());
+                $physical->Line2($addr->street2());
+                $physical->Locality($addr->city());
+                $physical->Region($addr->state());
+                $physical->PostalCode($addr->post_code());
+                $physical->Country($addr->country());
+                $address->PhysicalAddress($physical);
+                push @$addresses, $address;
+            }
+
+            # Right now, we're only sharing email address if the user
+            # has it. We don't share phone numbers.
+            if ($user->email()) {
+                my $address = NCIP::User::AddressInformation->new({UserAddressRoleType=>'Email Address'});
+                $address->ElectronicAddress(
+                    NCIP::ElectronicAddress->new({
+                        Type=>'Email Address',
+                        Data=>$user->email()
+                    })
+                );
+                push @$addresses, $address;
+            }
+
+            $optionalfields->UserAddressInformation($addresses);
+        }
+
+        # Fetch the user's home_ou. We'll need for a couple of things
+        # below here.
+        my $aou = $self->editor->retrieve_actor_org_unit($user->home_ou());
+
+        # Check for User Privilege.
+        if (grep {$_ eq 'User Privilege'} @$elements) {
+            # Get the user's group:
+            my $pgt = $self->editor->retrieve_permission_grp_tree($user->profile());
+            if ($pgt) {
+                my $privilege = NCIP::User::Privilege->new();
+                $privilege->AgencyId($aou->shortname());
+                $privilege->AgencyUserPrivilegeType($pgt->name());
+                $privilege->ValidToDate($user->expire_date());
+
+                my $status = 'Active';
+                if (_expired($user)) {
+                    $status = 'Expired';
+                } elsif ($U->is_true($user->barred())) {
+                    $status = 'Barred';
+                } elsif (!$U->is_true($user->active())) {
+                    $status = 'Inactive';
+                }
+                if ($status) {
+                    $privilege->UserPrivilegeStatus(
+                        NCIP::User::PrivilegeStatus->new({
+                            UserPrivilegeStatusType => $status
+                        })
+                    );
+                }
+
+                $optionalfields->UserPrivilege([$privilege]);
+            }
+        }
+
+        # Check for Block Or Trap.
+        if (grep {$_ eq 'Block Or Trap'} @$elements) {
+            my $blocks = [];
+
+            # First, let's check if the profile is blocked from ILL.
+            if (grep {$_->id() == $user->profile()} @{$self->{block_profiles}}) {
+                my $block = NCIP::User::BlockOrTrap->new();
+                $block->AgencyId($aou->shortname());
+                $block->BlockOrTrapType('Block Interlibrary Loan');
+                push @$blocks, $block;
+            }
+
+            # Next, we loop through the user's standing penalties
+            # looking for blocks on CIRC, HOLD, and RENEW.
+            my ($have_circ, $have_renew, $have_hold) = (0,0,0);
+            foreach my $penalty (@{$user->standing_penalties()}) {
+                my @block_list = split(/\|/, $penalty->standing_penalty->block_list());
+                my $ou = $self->editor->retrieve_actor_org_unit($penalty->standing_penalty->org_unit());
+
+                # Block checkout.
+                if (!$have_circ && grep {$_ eq 'CIRC'} @block_list) {
+                    my $bot = NCIP::User::BlockOrTrap->new();
+                    $bot->AgencyId($ou->shortname());
+                    $bot->BlockOrTrapType('Block Checkout');
+                    push @blocks, $bot;
+                    $have_circ = 1;
+                }
+
+                # Block holds.
+                if (!$have_hold && grep {$_ eq 'HOLD'} @block_list) {
+                    my $bot = NCIP::User::BlockOrTrap->new();
+                    $bot->AgencyId($ou->shotrname());
+                    $bot->BlockOrTrapType('Block Holds');
+                    push @blocks, $bot;
+                    $have_hold = 1;
+                }
+
+                # Block renewals.
+                if (!$have_renew && grep {$_ eq 'RENEW'} @block_list) {
+                    my $bot = NCIP::User::BlockOrTrap->new();
+                    $bot->AgencyId($ou->shortname());
+                    $bot->BlockOrTrapType('Block Renewals');
+                    push @blocks, $bot;
+                    $have_renew = 1;
+                }
+
+                # Stop after we report one of each, even if more
+                # blocks remain.
+                last if ($have_circ && $have_renew && $have_hold);
+            }
+
+            $optionalfields->BlockOrTrap($blocks);
+        }
+
+        $userdata->UserOptionalFields($optionalfields);
+    }
+
+    $response->data($userdata);
+
+    return $response;
 }
-
-sub checkin {}
-
-sub checkout {}
-
-sub renew {}
-
-sub request {}
-
-sub cancelrequest {}
-
-sub acceptitem {}
 
 # Implementation functions that might be useful to a subclass.
 
@@ -360,17 +489,6 @@ sub _init {
 
 # Standalone, "helper" functions.  These do not take an object or
 # class reference.
-
-# Strip leading and trailing whitespace (incl. newlines) from a string
-# value.
-sub _strip {
-    my $string = shift;
-    if ($string) {
-        $string =~ s/^\s+//;
-        $string =~ s/\s+$//;
-    }
-    return $string;
-}
 
 # Check if a user is past their expiration date.
 sub _expired {

@@ -298,4 +298,39 @@ sub parse_request_type {
     return $type;
 }
 
+=head2 find_barcode
+
+C<my $barcode = $ils-E<gt>find_barcode($request);>
+
+If you have a requrest type that includes a barcode identifier value,
+this routine will find it. It presently works only on LookupUser
+requests.
+
+=cut
+
+sub find_barcode {
+    my $self = shift;
+    my $request = shift;
+
+    my $barcode;
+    my $message = $self->parse_request_type($request);
+    return unless($message);
+    if ($message eq 'LookupUser') {
+        my $authinput = $request->{$message}->{AuthenticationInput};
+        return unless ($authinput);
+        # Convert to array ref if it isn't already.
+        if (ref $authinput ne 'ARRAY') {
+            $authinput = [$authinput];
+        }
+        foreach my $input (@$authinput) {
+            if ($input->{AuthenticationInputType} =~ /barcode/i) {
+                $barcode = $input->{AuthenticationInputData};
+                last;
+            }
+        }
+    }
+
+    return $barcode;
+}
+
 1;
