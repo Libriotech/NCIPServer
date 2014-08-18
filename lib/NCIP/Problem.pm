@@ -19,11 +19,53 @@
 package NCIP::Problem;
 use parent qw(Class::Accessor);
 
-# NCIP::Problem is the object used to report that a problem occurred
-# during message processing.  The fields are as defined in
-# Z39.83-1-2012.  Ext is avaialable for future use, but it is not
-# presently used by the problem template.  The obsolete
-# ProcessingError fields have been excluded.
+=head1 NAME
+
+Problem - Z39.83-1-2012
+
+=head1 SYNOPSIS
+
+
+
+=head1 DESCRIPTION
+
+NCIP::Problem is the object used to report that a problem occurred
+during message processing. Ext is avaialable for future use, but it is
+not presently used by the problem template.  The obsolete
+ProcessingError fields have been excluded.
+
+=head1 FIELDS
+
+=head2 ProblemType
+
+Text string to identify the type of problem that occurred.
+
+=head2 Scheme
+
+URI to indicate the scheme from which the problem type originates. The
+data dictionary indicates this field is required. The standard
+elsewhere indicates that schemes are optional. Most examples from
+vendors omit the scheme.
+
+=head2 ProblemDetail
+
+Text string describing the problem in detail.
+
+=head2 ProblemElement
+
+Text string to indicate the element that caused the problem. It may be
+NULL to indicate no element.
+
+=head2 ProblemValue
+
+Text string to indicate the value in which the problem occurred.
+
+=head2 Ext
+
+Not presently used in the templates, but provided as a field defined
+by the standard.
+
+=cut
 
 NCIP::Problem->mk_accessors(qw(ProblemType Scheme ProblemDetail ProblemElement
                                ProblemValue Ext));
