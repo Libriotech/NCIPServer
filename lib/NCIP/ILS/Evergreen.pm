@@ -75,7 +75,7 @@ my $U = 'OpenILS::Application::AppUtils';
 # The usual constructor:
 sub new {
     my $class = shift;
-    $class = ref $class or $class;
+    $class = ref($class) if (ref $class);
 
     # Instantiate our parent with the rest of the arguments.  It
     # creates a blessed hashref.
@@ -270,7 +270,7 @@ sub lookupuser {
                     my $bot = NCIP::User::BlockOrTrap->new();
                     $bot->AgencyId($ou->shortname());
                     $bot->BlockOrTrapType('Block Checkout');
-                    push @blocks, $bot;
+                    push @$blocks, $bot;
                     $have_circ = 1;
                 }
 
@@ -279,7 +279,7 @@ sub lookupuser {
                     my $bot = NCIP::User::BlockOrTrap->new();
                     $bot->AgencyId($ou->shotrname());
                     $bot->BlockOrTrapType('Block Holds');
-                    push @blocks, $bot;
+                    push @$blocks, $bot;
                     $have_hold = 1;
                 }
 
@@ -288,7 +288,7 @@ sub lookupuser {
                     my $bot = NCIP::User::BlockOrTrap->new();
                     $bot->AgencyId($ou->shortname());
                     $bot->BlockOrTrapType('Block Renewals');
-                    push @blocks, $bot;
+                    push @$blocks, $bot;
                     $have_renew = 1;
                 }
 
@@ -436,7 +436,7 @@ sub _init {
     foreach (@{$self->{config}->{patrons}->{block_profile}}) {
         if (ref $_) {
             my $pgt = $e->retrieve_permission_grp_tree($_->{grp});
-            push(@{$blocked_profiles}, $pgt) if ($pgt);
+            push(@{$self->{blocked_profiles}}, $pgt) if ($pgt);
         } else {
             my $result = $e->search_permission_grp_tree({name => $_});
             if ($result && @$result) {
