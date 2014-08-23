@@ -1,8 +1,8 @@
 <FromAgencyId>
-[%- fromagencyid -%]
+[%- data.fromagencyid -%]
 </FromAgencyId>
 <ToAgencyId>
-[%- toagencyid -%]
+[%- data.toagencyid -%]
 </ToAgencyId>
 [% FOREACH version IN data.versions -%]
 <VersionSupported>
