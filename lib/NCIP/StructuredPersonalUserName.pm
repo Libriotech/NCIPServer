@@ -18,7 +18,7 @@
 # ---------------------------------------------------------------
 package NCIP::StructuredPersonalUserName;
 
-use parent qw(Class:Accessor);
+use parent qw(Class::Accessor);
 
 # The name of this class is a bit unwieldy, but comes directly from
 # the standard.  I wonder if we shouldn't rename for our own sanity.
