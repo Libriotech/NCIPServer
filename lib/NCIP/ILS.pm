@@ -303,7 +303,7 @@ sub parse_request_type {
 
 C<my $barcode = $ils-E<gt>find_barcode($request);>
 
-If you have a requrest type that includes a barcode identifier value,
+If you have a request type that includes a barcode identifier value,
 this routine will find it. It presently works only on LookupUser
 requests.
 
