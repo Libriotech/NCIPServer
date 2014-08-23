@@ -170,7 +170,7 @@ sub lookupuser {
         # First, we'll look for name information.
         if (grep {$_ eq 'Name Information'} @$elements) {
             my $name = NCIP::StructuredPersonalUserName->new();
-            $name->Surname($user->given_name());
+            $name->Surname($user->family_name());
             $name->GivenName($user->first_given_name());
             $name->Prefix($user->prefix());
             $name->Suffix($user->suffix());
