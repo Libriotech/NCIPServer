@@ -318,15 +318,28 @@ sub find_barcode {
     return unless($message);
     if ($message eq 'LookupUser') {
         my $authinput = $request->{$message}->{AuthenticationInput};
-        return unless ($authinput);
-        # Convert to array ref if it isn't already.
-        if (ref $authinput ne 'ARRAY') {
-            $authinput = [$authinput];
-        }
-        foreach my $input (@$authinput) {
-            if ($input->{AuthenticationInputType} =~ /barcode/i) {
-                $barcode = $input->{AuthenticationInputData};
-                last;
+        if ($authinput) {
+            # Convert to array ref if it isn't already.
+            if (ref $authinput ne 'ARRAY') {
+                $authinput = [$authinput];
+            }
+            foreach my $input (@$authinput) {
+                if ($input->{AuthenticationInputType} =~ /barcode/i) {
+                    $barcode = $input->{AuthenticationInputData};
+                    last;
+                }
+            }
+        } else {
+            $authinput = $request->{$message}->{UserId};
+            return unless($authinput);
+            if (ref $authinput ne 'ARRAY') {
+                $authinput = [$authinput];
+            }
+            foreach my $input (@$authinput) {
+                if ($input->{UserIdentifierType} =~ /barcode/i) {
+                    $barcode = $input->{UserIdentifierValue};
+                    last;
+                }
             }
         }
     }
