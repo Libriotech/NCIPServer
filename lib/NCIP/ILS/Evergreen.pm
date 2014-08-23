@@ -251,7 +251,7 @@ sub lookupuser {
             my $blocks = [];
 
             # First, let's check if the profile is blocked from ILL.
-            if (grep {$_->id() == $user->profile()} @{$self->{block_profiles}}) {
+            if (grep {$_->id() == $user->profile()} @{$self->{blocked_profiles}}) {
                 my $block = NCIP::User::BlockOrTrap->new();
                 $block->AgencyId($aou->shortname());
                 $block->BlockOrTrapType('Block Interlibrary Loan');
@@ -262,8 +262,9 @@ sub lookupuser {
             # looking for blocks on CIRC, HOLD, and RENEW.
             my ($have_circ, $have_renew, $have_hold) = (0,0,0);
             foreach my $penalty (@{$user->standing_penalties()}) {
+                next unless($penalty->standing_penalty->block_list());
                 my @block_list = split(/\|/, $penalty->standing_penalty->block_list());
-                my $ou = $self->editor->retrieve_actor_org_unit($penalty->standing_penalty->org_unit());
+                my $ou = $self->editor->retrieve_actor_org_unit($penalty->org_unit());
 
                 # Block checkout.
                 if (!$have_circ && grep {$_ eq 'CIRC'} @block_list) {
@@ -275,9 +276,9 @@ sub lookupuser {
                 }
 
                 # Block holds.
-                if (!$have_hold && grep {$_ eq 'HOLD'} @block_list) {
+                if (!$have_hold && grep {$_ eq 'HOLD' || $_ eq 'FULFILL'} @block_list) {
                     my $bot = NCIP::User::BlockOrTrap->new();
-                    $bot->AgencyId($ou->shotrname());
+                    $bot->AgencyId($ou->shortname());
                     $bot->BlockOrTrapType('Block Holds');
                     push @$blocks, $bot;
                     $have_hold = 1;
