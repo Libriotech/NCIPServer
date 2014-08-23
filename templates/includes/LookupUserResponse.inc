@@ -41,7 +41,7 @@
 [% IF data.UserOptionalFields.UserAddressInformation -%]
   [% FOREACH element IN data.UserOptionalFields.UserAddressInformation -%]
      <UserAddressInformation>
-     <UserAddressRoleType>[% element.AddressRoleType | xml %]</UserAddressRoleType>
+     <UserAddressRoleType>[% element.UserAddressRoleType | xml %]</UserAddressRoleType>
      [% IF element.PhysicalAddress -%]
      <PhysicalAddress>
        <StructuredAddress>
