@@ -187,8 +187,8 @@ sub lookupversion {
 
     my $response = NCIP::Response->new({type => "LookupVersionResponse"});
     my $payload = {
-        fromagencyid => $request->{LookupVersion}->{ToAgencyId},
-        toagencyid => $request->{LookupVersion}->{FromAgencyId},
+        fromagencyid => $request->{LookupVersion}->{ToAgencyId}->{AgencyId},
+        toagencyid => $request->{LookupVersion}->{FromAgencyId}->{AgencyId},
         versions => [ NCIP::Const::SUPPORTED_VERSIONS ]
     };
     $response->data($payload);
