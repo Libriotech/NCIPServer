@@ -337,7 +337,7 @@ sub login {
     my $seed = $U->simplereq(
         'open-ils.auth',
         'open-ils.auth.authenticate.init',
-        $self->{config}->{username}
+        $self->{config}->{credentials}->{username}
     );
 
     # Actually login.
@@ -346,12 +346,12 @@ sub login {
             'open-ils.auth',
             'open-ils.auth.authenticate.complete',
             {
-                username => $self->{config}->{username},
+                username => $self->{config}->{credentials}->{username},
                 password => md5_hex(
-                    $seed . md5_hex($self->{config}->{password})
+                    $seed . md5_hex($self->{config}->{credentials}->{password})
                 ),
                 type => 'staff',
-                workstation => $self->{config}->{workstation}
+                workstation => $self->{config}->{credentials}->{workstation}
             }
         );
         if ($response) {
@@ -456,7 +456,7 @@ sub _init {
                 my $result = $e->retrieve_config_bib_source($data->{cbs});
                 $cbs = $result if ($result);
             } else {
-                my $result = $e->search_config_bib_source({source => $data-});
+                my $result = $e->search_config_bib_source({source => $data});
                 if ($result && @$result) {
                     $cbs = $result->[0]; # Use the first one.
                 }
