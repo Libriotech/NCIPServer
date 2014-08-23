@@ -6,7 +6,7 @@
 <ToAgencyId>
 <AgencyId>
 [%- data.toagencyid -%]
-<AgencyId>
+</AgencyId>
 </ToAgencyId>
 [% FOREACH version IN data.versions -%]
 <VersionSupported>
