@@ -310,6 +310,11 @@ LookupUser requests.
 It will return the barcode in scalar context, or the barcode and the
 tag of the field where the barcode was found in list context.
 
+If multiple barcode fields are provided, it returns the first one that
+it finds. This is not necessarily the first one given in the request
+message. Maybe we should add a plural form of this method to find all
+of the user barcodes provided?
+
 =cut
 
 sub find_user_barcode {
@@ -323,28 +328,29 @@ sub find_user_barcode {
     if ($message eq 'LookupUser') {
         my $authinput = $request->{$message}->{AuthenticationInput};
         if ($authinput) {
+            $field = 'AuthenticationInputData';
             # Convert to array ref if it isn't already.
             if (ref $authinput ne 'ARRAY') {
                 $authinput = [$authinput];
             }
             foreach my $input (@$authinput) {
                 if ($input->{AuthenticationInputType} =~ /barcode/i) {
-                    $barcode = $input->{AuthenticationInputData};
-                    $field = 'AuthenticationInputData';
+                    $barcode = $input->{$field};
                     last;
                 }
             }
         } else {
             $authinput = $request->{$message}->{UserId};
-            return unless($authinput);
-            if (ref $authinput ne 'ARRAY') {
-                $authinput = [$authinput];
-            }
-            foreach my $input (@$authinput) {
-                if ($input->{UserIdentifierType} =~ /barcode/i) {
-                    $barcode = $input->{UserIdentifierValue};
-                    $field = 'UserIdentifierValue';
-                    last;
+            $field = 'UserIdentifierValue';
+            if ($authinput) {
+                if (ref $authinput ne 'ARRAY') {
+                    $authinput = [$authinput];
+                }
+                foreach my $input (@$authinput) {
+                    if ($input->{UserIdentifierType} =~ /barcode/i) {
+                        $barcode = $input->{$field};
+                        last;
+                    }
                 }
             }
         }
