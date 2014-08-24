@@ -107,17 +107,17 @@ sub lookupuser {
     my $response = NCIP::Response->new({type => $message_type . "Response"});
     $response->header($self->make_header($request));
 
-    # Need to parse the request object to get the barcode and other
-    # data out.
+    # Need to parse the request object to get the user barcode.
     my ($barcode, $idfield) = $self->find_user_barcode($request);
 
     # If we can't find a barcode, report a problem.
     unless ($barcode) {
+        $idfield = 'AuthenticationInputType' unless ($idfield);
         # Fill in a problem object and stuff it in the response.
         my $problem = NCIP::Problem->new();
         $problem->ProblemType('Needed Data Missing');
         $problem->ProblemDetail('Cannot find user barcode in message.');
-        $problem->ProblemElement('AuthenticationInputType');
+        $problem->ProblemElement($idfield);
         $problem->ProblemValue('Barcode');
         $response->problem($problem);
         return $response;
