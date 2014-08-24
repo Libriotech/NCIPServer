@@ -226,6 +226,7 @@ sub lookupuser {
                 $privilege->AgencyId($aou->shortname());
                 $privilege->AgencyUserPrivilegeType($pgt->name());
                 $privilege->ValidToDate($user->expire_date());
+                $privilege->ValidFromDate($user->create_date());
 
                 my $status = 'Active';
                 if (_expired($user)) {
