@@ -341,8 +341,8 @@ sub find_user_barcode {
             }
         } else {
             $authinput = $request->{$message}->{UserId};
-            $field = 'UserIdentifierValue';
             if ($authinput) {
+                $field = 'UserIdentifierValue';
                 if (ref $authinput ne 'ARRAY') {
                     $authinput = [$authinput];
                 }
