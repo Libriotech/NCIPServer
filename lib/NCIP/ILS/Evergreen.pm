@@ -142,6 +142,7 @@ sub lookupuser {
         $problem->ProblemDetail("User with barcode $barcode unknown");
         $problem->ProblemElement('AuthenticationInputData');
         $problem->ProblemValue($barcode);
+        $response->problem($problem);
         return $response;
     }
 
