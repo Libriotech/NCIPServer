@@ -109,7 +109,7 @@ sub lookupuser {
 
     # Need to parse the request object to get the barcode and other
     # data out.
-    my $barcode = $self->find_barcode($request);
+    my ($barcode, $idfield) = $self->find_user_barcode($request);
 
     # If we can't find a barcode, report a problem.
     unless ($barcode) {
@@ -140,7 +140,7 @@ sub lookupuser {
         my $problem = NCIP::Problem->new();
         $problem->ProblemType('Unknown User');
         $problem->ProblemDetail("User with barcode $barcode unknown");
-        $problem->ProblemElement('AuthenticationInputData');
+        $problem->ProblemElement($idfield);
         $problem->ProblemValue($barcode);
         $response->problem($problem);
         return $response;

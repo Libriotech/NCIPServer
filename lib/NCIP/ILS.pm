@@ -301,19 +301,23 @@ sub parse_request_type {
 
 =head2 find_barcode
 
-C<my $barcode = $ils-E<gt>find_barcode($request);>
+C<my $barcode = $ils-E<gt>find_user_barcode($request);>
 
-If you have a request type that includes a barcode identifier value,
-this routine will find it. It presently works only on LookupUser
-requests.
+If you have a request type that includes a user barcode identifier
+value, this routine will find it. It presently works only on
+LookupUser requests.
+
+It will return the barcode in scalar context, or the barcode and the
+tag of the field where the barcode was found in list context.
 
 =cut
 
-sub find_barcode {
+sub find_user_barcode {
     my $self = shift;
     my $request = shift;
 
     my $barcode;
+    my $field;
     my $message = $self->parse_request_type($request);
     return unless($message);
     if ($message eq 'LookupUser') {
@@ -326,6 +330,7 @@ sub find_barcode {
             foreach my $input (@$authinput) {
                 if ($input->{AuthenticationInputType} =~ /barcode/i) {
                     $barcode = $input->{AuthenticationInputData};
+                    $field = 'AuthenticationInputData';
                     last;
                 }
             }
@@ -338,13 +343,14 @@ sub find_barcode {
             foreach my $input (@$authinput) {
                 if ($input->{UserIdentifierType} =~ /barcode/i) {
                     $barcode = $input->{UserIdentifierValue};
+                    $field = 'UserIdentifierValue';
                     last;
                 }
             }
         }
     }
 
-    return $barcode;
+    return (wantarray) ? ($barcode, $field) : $barcode;
 }
 
 1;
