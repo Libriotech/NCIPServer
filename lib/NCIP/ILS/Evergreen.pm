@@ -129,7 +129,7 @@ sub lookupuser {
         'open-ils.actor.user.fleshed.retrieve_by_barcode',
         $self->{session}->{authtoken},
         $barcode,
-        0
+        1
     );
 
     # Check for a failure, or a deleted, inactive, or expired user,
@@ -213,17 +213,13 @@ sub lookupuser {
             $optionalfields->UserAddressInformation($addresses);
         }
 
-        # Fetch the user's home_ou. We'll need for a couple of things
-        # below here.
-        my $aou = $self->editor->retrieve_actor_org_unit($user->home_ou());
-
         # Check for User Privilege.
         if (grep {$_ eq 'User Privilege'} @$elements) {
             # Get the user's group:
             my $pgt = $self->editor->retrieve_permission_grp_tree($user->profile());
             if ($pgt) {
                 my $privilege = NCIP::User::Privilege->new();
-                $privilege->AgencyId($aou->shortname());
+                $privilege->AgencyId($user->home_ou->shortname());
                 $privilege->AgencyUserPrivilegeType($pgt->name());
                 $privilege->ValidToDate($user->expire_date());
                 $privilege->ValidFromDate($user->create_date());
@@ -255,7 +251,7 @@ sub lookupuser {
             # First, let's check if the profile is blocked from ILL.
             if (grep {$_->id() == $user->profile()} @{$self->{blocked_profiles}}) {
                 my $block = NCIP::User::BlockOrTrap->new();
-                $block->AgencyId($aou->shortname());
+                $block->AgencyId($user->home_ou->shortname());
                 $block->BlockOrTrapType('Block Interlibrary Loan');
                 push @$blocks, $block;
             }
