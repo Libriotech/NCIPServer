@@ -27,7 +27,6 @@ use OpenSRF::System;
 use OpenSRF::Utils qw/:datetime/;
 use OpenSRF::Utils::SettingsClient;
 use OpenILS::Utils::Fieldmapper;
-use OpenILS::Utils::CStoreEditor qw/:funcs/;
 use OpenILS::Application::AppUtils;
 use OpenILS::Const qw/:const/;
 use MARC::Record;
@@ -317,25 +316,6 @@ sub lookupuser {
 
 # Implementation functions that might be useful to a subclass.
 
-# Get a CStoreEditor:
-sub editor {
-    my $self = shift;
-
-    # If we have an editor, check the validity of the auth session, then
-    # invalidate the editor if the session is not valid.
-    if ($self->{editor}) {
-        undef($self->{editor}) unless ($self->checkauth());
-    }
-
-    # If we don't have an editor, make a new one.
-    unless (defined($self->{editor})) {
-        $self->login() unless ($self->checkauth());
-        $self->{editor} = new_editor(authtoken=>$self->{session}->{authtoken});
-    }
-
-    return $self->{editor};
-}
-
 # Login via OpenSRF to Evergreen.
 sub login {
     my $self = shift;
@@ -372,10 +352,6 @@ sub login {
 sub checkauth {
     my $self = shift;
 
-    # We implement our own version of this function, rather than rely
-    # on CStoreEditor, because we may want to check this at times that
-    # we don't have a CStoreEditor.
-
     # We use AppUtils to do the heavy lifting.
     if (defined($self->{session})) {
         if ($U->check_user_session($self->{session}->{authtoken})) {
@@ -406,8 +382,7 @@ sub _configure {
                             ForceArray => ['block_profile', 'stat_cat_entry']);
 }
 
-# Bootstrap OpenSRF::System, load the IDL, and initialize the
-# CStoreEditor module.
+# Bootstrap OpenSRF::System and load the IDL.
 sub _bootstrap {
     my $self = shift;
 
@@ -416,8 +391,6 @@ sub _bootstrap {
 
     my $idl = OpenSRF::Utils::SettingsClient->new->config_value("IDL");
     Fieldmapper->import(IDL => $idl);
-
-    OpenILS::Utils::CStoreEditor->init;
 }
 
 # Login and then initialize some object data based on the
@@ -428,11 +401,11 @@ sub _init {
     # Login to Evergreen.
     $self->login();
 
-    # Create an editor.
-    my $e = $self->editor();
-
     # Retrieve the work_ou as an object.
-    my $work_ou = $e->search_actor_org_unit(
+    my $work_ou = $U->simplereq(
+        'open-ils.pcrud',
+        'open-ils.pcrud.search.aou',
+        $self->{session}->{authtoken},
         {shortname => $self->{config}->{credentials}->{work_ou}}
     );
     $self->{work_ou} = $work_ou->[0] if ($work_ou && @$work_ou);
@@ -442,10 +415,18 @@ sub _init {
     $self->{blocked_profiles} = [];
     foreach (@{$self->{config}->{patrons}->{block_profile}}) {
         if (ref $_) {
-            my $pgt = $e->retrieve_permission_grp_tree($_->{grp});
+            my $pgt = $U->simplereq(
+                'open-ils.pcrud',
+                'open-ils.pcrud.retrieve.pgt',
+                $self->{session}->{authtoken},
+                $_->{grp});
             push(@{$self->{blocked_profiles}}, $pgt) if ($pgt);
         } else {
-            my $result = $e->search_permission_grp_tree({name => $_});
+            my $result = $U->simplereq(
+                'open-ils.pcrud',
+                'open-ils.pcrud.search.pgt',
+                $self->{session}->{authtoken},
+                {name => $_});
             if ($result && @$result) {
                 map {push(@{$self->{blocked_profiles}}, $_)} @$result;
             }
@@ -455,15 +436,27 @@ sub _init {
     # Load the bib source if we're not using precats.
     unless ($self->{config}->{items}->{use_precats}) {
         # Retrieve the default
-        my $cbs = $e->retrieve_config_bib_source(BIB_SOURCE_DEFAULT);
+        my $cbs = $U->simplereq(
+            'open-ils.pcrud',
+            'open-ils.pcrud.retrieve.cbs',
+            $self->{session}->{authtoken},
+            BIB_SOURCE_DEFAULT);
         my $data = $self->{config}->{items}->{bib_source};
         if ($data) {
             $data = $data->[0] if (ref($data) eq 'ARRAY');
             if (ref $data) {
-                my $result = $e->retrieve_config_bib_source($data->{cbs});
+                my $result = $U->simplereq(
+                    'open-ils.pcrud',
+                    'open-ils.pcrud.retrieve.cbs',
+                    $self->{session}->{authtoken},
+                    $data->{cbs});
                 $cbs = $result if ($result);
             } else {
-                my $result = $e->search_config_bib_source({source => $data});
+                my $result = $U->simplereq(
+                    'open-ils.pcrud',
+                    'open-ils.pcrud.search.cbs',
+                    $self->{session}->{authtoken},
+                    {source => $data});
                 if ($result && @$result) {
                     $cbs = $result->[0]; # Use the first one.
                 }
@@ -481,7 +474,9 @@ sub _init {
         # We want to limit the search to the work org and its
         # ancestors.
         my $ancestors = $U->get_org_ancestors($self->{work_ou}->id());
-        my $result = $e->search_asset_stat_cat_entry(
+        my $result = $U->simplereq(
+            'open-ils.cstore',
+            'open-ils.cstore.direct.asset.stat_cat_entry.search',
             {
                 stat_cat => $_->{stat_cat},
                 value => $_->{content},
