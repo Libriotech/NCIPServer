@@ -216,7 +216,11 @@ sub lookupuser {
         # Check for User Privilege.
         if (grep {$_ eq 'User Privilege'} @$elements) {
             # Get the user's group:
-            my $pgt = $self->editor->retrieve_permission_grp_tree($user->profile());
+            my $pgt = $U->simplereq(
+                'open-ils.pcrud',
+                'open-ils.pcrud.retrieve.pgt',
+                $self->{session}->{authtoken},
+                $user->profile());
             if ($pgt) {
                 my $privilege = NCIP::User::Privilege->new();
                 $privilege->AgencyId($user->home_ou->shortname());
@@ -262,7 +266,11 @@ sub lookupuser {
             foreach my $penalty (@{$user->standing_penalties()}) {
                 next unless($penalty->standing_penalty->block_list());
                 my @block_list = split(/\|/, $penalty->standing_penalty->block_list());
-                my $ou = $self->editor->retrieve_actor_org_unit($penalty->org_unit());
+                my $ou = $U->simplereq(
+                    'open-ils.pcrud',
+                    'open-ils.pcrud.retrieve.aou',
+                    $self->{session}->{authtoken},
+                    $penalty->org_unit());
 
                 # Block checkout.
                 if (!$have_circ && grep {$_ eq 'CIRC'} @block_list) {
