@@ -219,7 +219,8 @@ sub lookupuser {
                 'open-ils.pcrud',
                 'open-ils.pcrud.retrieve.pgt',
                 $self->{session}->{authtoken},
-                $user->profile());
+                $user->profile()
+            );
             if ($pgt) {
                 my $privilege = NCIP::User::Privilege->new();
                 $privilege->AgencyId($user->home_ou->shortname());
@@ -269,7 +270,8 @@ sub lookupuser {
                     'open-ils.pcrud',
                     'open-ils.pcrud.retrieve.aou',
                     $self->{session}->{authtoken},
-                    $penalty->org_unit());
+                    $penalty->org_unit()
+                );
 
                 # Block checkout.
                 if (!$have_circ && grep {$_ eq 'CIRC'} @block_list) {
@@ -402,41 +404,40 @@ sub _init {
     $self->login();
 
     # Retrieve the work_ou as an object.
-    my $work_ou = $U->simplereq(
+    $self->{work_ou} = $U->simplereq(
         'open-ils.pcrud',
         'open-ils.pcrud.search.aou',
         $self->{session}->{authtoken},
         {shortname => $self->{config}->{credentials}->{work_ou}}
     );
-    $self->{work_ou} = $work_ou->[0] if ($work_ou && @$work_ou);
 
     # Load the barred groups as pgt objects into a blocked_profiles
     # list.
     $self->{blocked_profiles} = [];
     foreach (@{$self->{config}->{patrons}->{block_profile}}) {
+        my $pgt;
         if (ref $_) {
-            my $pgt = $U->simplereq(
+            $pgt = $U->simplereq(
                 'open-ils.pcrud',
                 'open-ils.pcrud.retrieve.pgt',
                 $self->{session}->{authtoken},
-                $_->{grp});
-            push(@{$self->{blocked_profiles}}, $pgt) if ($pgt);
+                $_->{grp}
+            );
         } else {
-            my $result = $U->simplereq(
+            $pgt = $U->simplereq(
                 'open-ils.pcrud',
                 'open-ils.pcrud.search.pgt',
                 $self->{session}->{authtoken},
-                {name => $_});
-            if ($result && @$result) {
-                map {push(@{$self->{blocked_profiles}}, $_)} @$result;
-            }
+                {name => $_}
+            );
         }
+        push(@{$self->{blocked_profiles}}, $pgt) if ($pgt);
     }
 
     # Load the bib source if we're not using precats.
     unless ($self->{config}->{items}->{use_precats}) {
         # Retrieve the default
-        my $cbs = $U->simplereq(
+        $self->{bib_source} = $U->simplereq(
             'open-ils.pcrud',
             'open-ils.pcrud.retrieve.cbs',
             $self->{session}->{authtoken},
@@ -444,25 +445,24 @@ sub _init {
         my $data = $self->{config}->{items}->{bib_source};
         if ($data) {
             $data = $data->[0] if (ref($data) eq 'ARRAY');
+            my $result;
             if (ref $data) {
-                my $result = $U->simplereq(
+                $result = $U->simplereq(
                     'open-ils.pcrud',
                     'open-ils.pcrud.retrieve.cbs',
                     $self->{session}->{authtoken},
-                    $data->{cbs});
-                $cbs = $result if ($result);
+                    $data->{cbs}
+                );
             } else {
-                my $result = $U->simplereq(
+                $result = $U->simplereq(
                     'open-ils.pcrud',
                     'open-ils.pcrud.search.cbs',
                     $self->{session}->{authtoken},
-                    {source => $data});
-                if ($result && @$result) {
-                    $cbs = $result->[0]; # Use the first one.
-                }
+                    {source => $data}
+                );
             }
+            $self->{bib_source} = $result if ($result);
         }
-        $self->{bib_source} = $cbs;
     }
 
     # Load the required asset.stat_cat_entries:
@@ -474,6 +474,7 @@ sub _init {
         # We want to limit the search to the work org and its
         # ancestors.
         my $ancestors = $U->get_org_ancestors($self->{work_ou}->id());
+        # We only want 1, so we don't do .atomic.
         my $result = $U->simplereq(
             'open-ils.cstore',
             'open-ils.cstore.direct.asset.stat_cat_entry.search',
@@ -483,9 +484,7 @@ sub _init {
                 owner => $ancestors
             }
         );
-        if ($result && @$result) {
-            map {push(@{$self->{stat_cat_entries}}, $_)} @$result;
-        }
+        push(@{$self->{stat_cat_entries}}, $result) if ($result);
     }
 }
 
