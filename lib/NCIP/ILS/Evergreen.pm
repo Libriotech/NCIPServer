@@ -469,7 +469,7 @@ sub _init {
     # Load the required asset.stat_cat_entries:
     $self->{stat_cat_entries} = [];
     # First, make a regex for our ou and ancestors:
-    my $ancestors = join("|", $U->get_org_ancestors($self->{work_ou}->id()));
+    my $ancestors = join("|", @{$U->get_org_ancestors($self->{work_ou}->id())});
     my $re = qr/(?:$ancestors)/;
     # Get the uniq stat_cat ids from the configuration:
     my @cats = uniq map {$_->{stat_cat}} @{$self->{config}->{items}->{stat_cat_entry}};
