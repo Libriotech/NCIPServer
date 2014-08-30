@@ -32,6 +32,7 @@ use OpenILS::Const qw/:const/;
 use MARC::Record;
 use MARC::Field;
 use MARC::File::XML;
+use List::MoreUtils qw/uniq/;
 
 # We need a bunch of NCIP::* objects.
 use NCIP::Response;
@@ -467,24 +468,24 @@ sub _init {
 
     # Load the required asset.stat_cat_entries:
     $self->{stat_cat_entries} = [];
-    foreach (@{$self->{config}->{items}->{stat_cat_entry}}) {
+    # First, make a regex for our ou and ancestors:
+    my $ancestors = join("|", $U->get_org_ancestors($self->{work_ou}->id()));
+    my $re = qr/(?:$ancestors)/;
+    # Get the uniq stat_cat ids from the configuration:
+    my @cats = uniq map {$_->{stat_cat}} @{$self->{config}->{items}->{stat_cat_entry}};
+    # Retrieve all of the fleshed stat_cats and entries for the above.
+    my $stat_cats = $U->simplereq(
+        'open-ils.circ',
+        'open-ils.circ.stat_cat.asset.retrieve.batch',
+        $self->{session}->{authtoken},
+        @cats
+    );
+    foreach my $entry (@{$self->{config}->{items}->{stat_cat_entry}}) {
         # Must have the stat_cat attr and the name, so we must have a
         # reference.
-        next unless(ref $_);
-        # We want to limit the search to the work org and its
-        # ancestors.
-        my $ancestors = $U->get_org_ancestors($self->{work_ou}->id());
-        # We only want 1, so we don't do .atomic.
-        my $result = $U->simplereq(
-            'open-ils.cstore',
-            'open-ils.cstore.direct.asset.stat_cat_entry.search',
-            {
-                stat_cat => $_->{stat_cat},
-                value => $_->{content},
-                owner => $ancestors
-            }
-        );
-        push(@{$self->{stat_cat_entries}}, $result) if ($result);
+        next unless(ref $entry);
+        my ($stat) = grep {$_->id() == $entry->{stat_cat}} @$stat_cats;
+        push(@{$self->{stat_cat_entries}}, grep {$_->owner() =~ $re && $_->value() eq $entry->{content}} @{$stat->entries()});
     }
 }
 
