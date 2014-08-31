@@ -323,7 +323,6 @@ sub find_user_barcode {
     my $barcode;
     my $field;
     my $message = $self->parse_request_type($request);
-    return unless($message);
 
     # Check for UserId first because it is more common and still valid
     # in LookupUser.
@@ -357,6 +356,47 @@ sub find_user_barcode {
                 $barcode = $input->{$field};
                 last;
             }
+        }
+    }
+
+    return (wantarray) ? ($barcode, $field) : $barcode;
+}
+
+=head2 find_item_barcode
+
+C<my $barcode = $ils-E<gt>find_item_barcode($request);>
+
+If you have a request type that includes an item barcode identifier
+value, this routine will find it.
+
+It will return the barcode in scalar context, or the barcode and the
+tag of the field where the barcode was found in list context.
+
+If multiple barcode fields are provided, it returns the first one that
+it finds. This is not necessarily the first one given in the request
+message. Maybe we should add a plural form of this method to find all
+of the item barcodes provided?
+
+=cut
+
+sub find_item_barcode {
+    my $self = shift;
+    my $request = shift;
+
+    my $barcode;
+    my $field;
+    my $message = $self->parse_request_type($request);
+
+    my $idinput = $request->{$message}->{ItemId};
+    if ($idinput) {
+        $field = 'ItemIdentifierValue';
+        $idinput = [$idinput] unless (ref($idinput) eq 'ARRAY');
+        foreach my $input (@$idinput) {
+            if ($input->{ItemIdentifierType}) {
+                next unless ($input->{ItemIdentifierType} =~ /barcode/i);
+            }
+            $barcode = $input->{ItemIdentifierValue};
+            last if ($barcode);
         }
     }
 
