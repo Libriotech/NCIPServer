@@ -299,13 +299,12 @@ sub parse_request_type {
     return $type;
 }
 
-=head2 find_barcode
+=head2 find_user_barcode
 
 C<my $barcode = $ils-E<gt>find_user_barcode($request);>
 
 If you have a request type that includes a user barcode identifier
-value, this routine will find it. It presently works only on
-LookupUser requests.
+value, this routine will find it.
 
 It will return the barcode in scalar context, or the barcode and the
 tag of the field where the barcode was found in list context.
@@ -325,33 +324,38 @@ sub find_user_barcode {
     my $field;
     my $message = $self->parse_request_type($request);
     return unless($message);
-    if ($message eq 'LookupUser') {
-        my $authinput = $request->{$message}->{AuthenticationInput};
-        if ($authinput) {
-            $field = 'AuthenticationInputData';
-            # Convert to array ref if it isn't already.
-            if (ref $authinput ne 'ARRAY') {
-                $authinput = [$authinput];
+
+    # Check for UserId first because it is more common and still valid
+    # in LookupUser.
+    my $authinput = $request->{$message}->{UserId};
+    if ($authinput) {
+        $field = 'UserIdentifierValue';
+        if (ref $authinput ne 'ARRAY') {
+            $authinput = [$authinput];
+        }
+        foreach my $input (@$authinput) {
+            # UserIdentifierType is optional, so we check if it is
+            # there. If it is, we skip this entry unless the
+            # identifier type contains the string barcode
+            if ($input->{UserIdentifierType}) {
+                next unless ($input->{UserIdentifierType} =~ /barcode/i);
             }
-            foreach my $input (@$authinput) {
-                if ($input->{AuthenticationInputType} =~ /barcode/i) {
-                    $barcode = $input->{$field};
-                    last;
-                }
-            }
-        } else {
-            $authinput = $request->{$message}->{UserId};
-            if ($authinput) {
-                $field = 'UserIdentifierValue';
-                if (ref $authinput ne 'ARRAY') {
-                    $authinput = [$authinput];
-                }
-                foreach my $input (@$authinput) {
-                    if ($input->{UserIdentifierType} =~ /barcode/i) {
-                        $barcode = $input->{$field};
-                        last;
-                    }
-                }
+            # We take the first field we find, unless the
+            # identifier type says it is not a barcode.
+            $barcode = $input->{$field};
+            last;
+        }
+    } elsif ($message eq 'LookupUser') {
+        $field = 'AuthenticationInputData';
+        $authinput = $request->{$message}->{AuthenticationInput};
+        # Convert to array ref if it isn't already.
+        if (ref $authinput ne 'ARRAY') {
+            $authinput = [$authinput];
+        }
+        foreach my $input (@$authinput) {
+            if ($input->{AuthenticationInputType} =~ /barcode/i) {
+                $barcode = $input->{$field};
+                last;
             }
         }
     }
