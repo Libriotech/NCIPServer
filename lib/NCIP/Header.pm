@@ -19,11 +19,54 @@
 package NCIP::Header;
 use parent qw(Class::Accessor);
 
-# This is a NCIP ResponseHeader object.  We do not implement an
-# initator, so we do not implement the InitiationHeader and we do not
-# attempt to make this object generic enough to handle that field.
-# The fields are as defined in Z39.83-1-2012.  Ext is provided but is
-# not used by the current iteration of NCIPServer.
+=head1 NAME
+
+Header - Response Header as Defined in z39.83-1-2012
+
+=head1 SYNOPSIS
+
+
+
+=head1 DESCRIPTION
+
+This is a NCIP ResponseHeader object.  We do not implement an
+initator, so we do not implement the InitiationHeader and we do not
+attempt to make this object generic enough to handle that field.
+The fields are as defined in Z39.83-1-2012.  Ext is provided but is
+not used by the current iteration of NCIPServer.
+
+=head1 FIELDS
+
+=head2 FromSystemId
+
+Not used in the current implementation.
+
+=head2 FromSystemAuthentication
+
+Not used in the current implementation.
+
+=head2 FromAgencyId
+
+AgencyId of the agency sending the message.
+
+=head2 FromAgencyAuthentication
+
+Not used in the current implementation.
+
+=head2 ToSystemId
+
+Not used in the current implementation.
+
+=head2 ToAgencyId
+
+AgencyId of the agency receiving the message.
+
+=head2 Ext
+
+Not used in the current implementation.
+
+
+=cut
 
 NCIP::Header->mk_accessors(qw(FromSystemId FromSystemAuthentication
                                FromAgencyId FromAgencyAuthentication
