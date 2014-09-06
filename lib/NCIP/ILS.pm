@@ -30,9 +30,9 @@ NCIP::ILS - A base class for NIPServer ILS drivers.
 
 =head1 SYNOPSIS
 
-C<use NCIP::ILS;>
+    use NCIP::ILS;
 
-C<my $ils = NCIP::ILS-E<gt>new(name =E<gt> $config-E<gt>{NCIP.ils.value});>
+    $ils = NCIP::ILS->new(name => $config->{NCIP.ils.value});
 
 =head1 DESCRIPTION
 
@@ -207,7 +207,7 @@ subclass.
 
 =head2 unsupportedservice
 
-C<my $response = $ils-E<gt>unsupportedservice($request);>
+    $response = $ils->unsupportedservice($request);
 
 This method has the same signature as a regular service handler
 method.  It returns a response containing an Unsupported Service
@@ -237,7 +237,7 @@ sub unsupportedservice {
 
 =head2 make_header
 
-C<$response-E<gt>header($ils-E<gt>make_header($request));>
+    $response->header($ils->make_header($request));
 
 All subclasses will possibly want to create a ResponseHeader for the
 response message.  Since the code for that could be highly redundant
@@ -273,7 +273,7 @@ sub make_header {
 
 =head2 parse_request_type
 
-C<my $type = $ils-E<gt>parse_request_type($request);>
+    $type = $ils->parse_request_type($request);
 
 Given the request hashref object, parse_request_type will return the
 service being requested in the message.  This method is called by
@@ -301,7 +301,7 @@ sub parse_request_type {
 
 =head2 find_user_barcode
 
-C<my $barcode = $ils-E<gt>find_user_barcode($request);>
+    $barcode = $ils->find_user_barcode($request);
 
 If you have a request type that includes a user barcode identifier
 value, this routine will find it.
@@ -364,7 +364,7 @@ sub find_user_barcode {
 
 =head2 find_item_barcode
 
-C<my $barcode = $ils-E<gt>find_item_barcode($request);>
+    $barcode = $ils->find_item_barcode($request);
 
 If you have a request type that includes an item barcode identifier
 value, this routine will find it.
