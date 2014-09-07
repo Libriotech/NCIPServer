@@ -1,8 +1,19 @@
 <RequestId>
-  <AgencyId>[% requestagency | xml %]</AgencyId>
-  <RequestIdentifierValue>[% requestid | xml %]</RequestIdentifierValue>
+[% IF data.RequestId.AgencyId -%]
+<AgencyId>[% data.RequestId.AgencyId | xml %]</AgencyId>
+[% END -%]
+[% IF data.RequestId.RequestIdentifierType -%]
+<RequestIdentifierType>[% data.RequestId.RequestIdentifierType | xml %]</RequestIdentifierType>
+[% END -%]
+<RequestIdentifierValue>[% data.RequestId.RequestIdentifierValue | xml %]</RequestIdentifierValue>
 </RequestId>
+[% IF data.ItemId -%]
 <ItemId>
-  <ItemIdentifierType>Item Barcode</ItemIdentifierType>
-  <ItemIdentifierValue>[% newbarcode | xml%]</ItemIdentifierValue>
+[% IF data.ItemId.AgencyId -%]
+<AgencyId>[% data.ItemId.AgencyId | xml %]</AgencyId>
+[% IF data.ItemId.ItemIdentifierType -%]
+<ItemIdentifierType>[% data.ItemId.IdentifierType | xml %]</ItemIdentifierType>
+[% END -%]
+<ItemIdentifierValue>[% data.ItemId.ItemIdentifierValue | xml%]</ItemIdentifierValue>
 </ItemId>
+[% END -%]
