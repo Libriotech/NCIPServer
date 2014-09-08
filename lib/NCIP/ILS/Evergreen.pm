@@ -886,7 +886,7 @@ sub create_fuller_copy {
         eval {
             $bib = $ses->request(
                 'open-ils.pcrud.create.bre',
-                $authtoken,
+                $self->{session}->{authtoken},
                 $bib
             )->gather(1);
         };
@@ -895,7 +895,7 @@ sub create_fuller_copy {
             eval {
                 $ses->request(
                     'open-ils.pcrud.transaction.rollback',
-                    $authtoken
+                    $self->{session}->{authtoken}
                 )->gather(1);
             };
         }
@@ -915,7 +915,7 @@ sub create_fuller_copy {
             eval {
                 $acn = $ses->request(
                     'open-ils.pcrud.create.acn',
-                    $authtoken,
+                    $self->{session}->{authtoken},
                     $acn
                 )->gather(1);
             };
@@ -924,7 +924,7 @@ sub create_fuller_copy {
                 eval {
                     $ses->request(
                         'open-ils.pcrud.transaction.rollback',
-                        $authtoken
+                        $self->{session}->{authtoken}
                     )->gather(1);
                 };
             }
@@ -966,7 +966,7 @@ sub create_fuller_copy {
                 eval {
                     $ses->request(
                         'open-ils.pcrud.transaction.rollback',
-                        $authtoken
+                        $self->{session}->{authtoken}
                     )->gather(1) if ($xact);
                 };
             }
@@ -990,7 +990,7 @@ sub create_fuller_copy {
             $U->simplereq(
                 'open-ils.circ',
                 'open-ils.circ.stat_cat.asset.copy_map.create',
-                $authtoken,
+                $self->{session}->{authtoken},
                 $map
             );
         }
@@ -1312,8 +1312,8 @@ sub _problem_from_event {
         {
             ProblemType => $type,
             ProblemDetail => $detail,
-            ProblemElement => ($element) ? $element : 'NULL';
-            ProblemValue => ($value) ? $vale : 'NULL';
+            ProblemElement => ($element) ? $element : 'NULL',
+            ProblemValue => ($value) ? $value : 'NULL'
         }
     );
 }
