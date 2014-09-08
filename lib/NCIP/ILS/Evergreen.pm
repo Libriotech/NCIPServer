@@ -342,7 +342,7 @@ sub acceptitem {
 
     # Common preparation.
     my $message = $self->parse_request_type($request);
-    my $response = NCIP::Response->new(type => $message . 'Response');
+    my $response = NCIP::Response->new({type => $message . 'Response'});
     $response->header($self->make_header($request));
 
     # We only accept holds for the time being.
