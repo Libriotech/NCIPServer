@@ -48,7 +48,7 @@ or something similar.
 
 =cut
 
-NCIP::RequestId_>mk_accessors(
+NCIP::RequestId->mk_accessors(
     qw(
           AgencyId
           RequestIdentifierType
