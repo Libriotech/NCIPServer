@@ -388,11 +388,11 @@ sub acceptitem {
                 NCIP::Problem->new(
                     {
                         ProblemType => 'Duplicate Item',
-                        ProblemDescription => "Item with barcode $barcode already exists.",
+                        ProblemDescription => "Item with barcode $item_barcode already exists.",
                         ProblemElement => $item_idfield,
-                        ProblemValue => $barcode
+                        ProblemValue => $item_barcode
                     }
-                );
+                )
             );
             return $response;
         }
@@ -405,7 +405,7 @@ sub acceptitem {
         # need it in other handlers. Such a function would be a
         # candidate to go into our parent, NCIP::ILS.
         my $item_info = {
-            barcode => $barcode,
+            barcode => $item_barcode,
             call_number => $request->{$message}->{ItemOptionalFields}->{ItemDescription}->{CallNumber},
             title => $request->{$message}->{ItemOptionalFields}->{BibliographicDescription}->{Author},
             author => $request->{$message}->{ItemOptionalFields}->{BibliographicDescription}->{Title},
@@ -430,7 +430,7 @@ sub acceptitem {
                     ProblemType => 'Temporary Processing Failure',
                     ProblemDetail => 'Failed to create the item in the system',
                     ProblemElement => $item_idfield,
-                    ProblemValue => $barcode
+                    ProblemValue => $item_barcode
                 }
             );
             return $response;
@@ -459,15 +459,15 @@ sub acceptitem {
         $data->{RequestId} = NCIP::RequestId->new(
             {
                 AgencyId => $request->{$message}->{RequestId}->{AgencyId},
-                RequestIdentifierType => $request->{$message}->{RequestId}->{RequestIdentifierType};
-                RequestIdentifierValue => $request->{$message}->{RequestId}->{RequestIdentifierValue};
+                RequestIdentifierType => $request->{$message}->{RequestId}->{RequestIdentifierType},
+                RequestIdentifierValue => $request->{$message}->{RequestId}->{RequestIdentifierValue}
             }
         );
         $data->{ItemId} = NCIP::Item::Id->new(
             {
                 AgencyId => $request->{$message}->{ItemId}->{AgencyId},
-                ItemIdentifierType => $request->{$message}->{ItemId}->{ItemIdentifierType};
-                ItemIdentifierValue => $request->{$message}->{ItemId}->{ItemIdentifierValue};
+                ItemIdentifierType => $request->{$message}->{ItemId}->{ItemIdentifierType},
+                ItemIdentifierValue => $request->{$message}->{ItemId}->{ItemIdentifierValue}
             }
         );
         $response->data($data);
