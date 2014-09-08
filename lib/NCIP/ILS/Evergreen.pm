@@ -346,7 +346,7 @@ sub acceptitem {
     $response->header($self->make_header($request));
 
     # We only accept holds for the time being.
-    if ($request->{$message}->{RequestedActionType} =~ /^hold\w/i) {
+    if ($request->{$message}->{RequestedActionType} !~ /^hold\w/i) {
         # We need the item id or we can't do anything at all.
         my ($item_barcode, $item_idfield) = $self->find_item_barcode($request);
         if (ref($item_barcode) eq 'NCIP::Problem') {
