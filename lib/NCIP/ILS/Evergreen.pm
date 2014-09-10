@@ -388,7 +388,7 @@ sub acceptitem {
                 NCIP::Problem->new(
                     {
                         ProblemType => 'Duplicate Item',
-                        ProblemDescription => "Item with barcode $item_barcode already exists.",
+                        ProblemDetail => "Item with barcode $item_barcode already exists.",
                         ProblemElement => $item_idfield,
                         ProblemValue => $item_barcode
                     }
