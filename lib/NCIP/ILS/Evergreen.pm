@@ -525,7 +525,7 @@ sub checkinitem {
             NCIP::Problem->new(
                 {
                     ProblemType => 'Unknown Item',
-                    ProblemDetail => "Item with barcode $barcode is not known.",
+                    ProblemDetail => "Item with barcode $item_barcode is not known.",
                     ProblemElement => $item_idfield,
                     ProblemValue => $item_barcode
                 }
@@ -551,7 +551,7 @@ sub checkinitem {
             NCIP::Problem->new(
                 {
                     ProblemType => 'Item Not Checked Out',
-                    ProblemDetail => "Item with barcode $barcode not checkout out.",
+                    ProblemDetail => "Item with barcode $item_barcode not checkout out.",
                     ProblemElement => $item_idfield,
                     ProblemValue => $item_barcode
                 }
@@ -561,13 +561,27 @@ sub checkinitem {
         # Get data on the patron who has it checked out.
         my $user = $self->retrieve_user_by_id($circ->usr());
 
-        # At some point in the future, we should probably check if the
-        # request contains a user barcode. We would then look that
-        # user up, too, and make sure it is the same user that has the
-        # item checked out. If not, we would report a
-        # problem. However, the user id is optional in the CheckInItem
-        # message, and it doesn't look like our target system sends
-        # it.
+        # Check if an optional UserId was provided. If so, make sure
+        # the copy was checked out to that user. We record the id
+        # field to report it as the problem value if the copy is
+        # checked out to someone else.
+        my ($circ_usr_barcode, $circ_usr_idfield) = $self->find_user_barcode($request);
+        if (ref($circ_usr_barcode) ne 'NCIP::Problem') {
+            $circ_usr = $self->retrieve_user_by_bacode($circ_user_barcode);
+            if ($circ_usr->id() != $user->id()) {
+                $response->problem(
+                    NCIP::Problem->new(
+                        {
+                            ProblemType => 'Item Not Checked Out To This User',
+                            ProblemDetail => "Item with barcode $item_barcode not checkout out to user with barcode $circ_usr_barcode.",
+                            ProblemElement => $cir_usr_idfield,
+                            ProblemValue => $circ_usr_barcode
+                        }
+                    )
+                );
+                return $response; # Short circuit
+            }
+        }
 
         # Checkin parameters. We want to skip hold targeting or making
         # transits, to force the checkin despite the copy status, as
