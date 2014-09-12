@@ -377,7 +377,7 @@ sub acceptitem {
         }
 
         # Check if the item barcode already exists:
-        my $item = $self->retrieve_copy_by_barcode($item_barcode);
+        my $item = $self->retrieve_copy_details_by_barcode($item_barcode);
         if ($item) {
             # What to do here was not defined in the
             # specification. Since the copies that we create this way
@@ -482,6 +482,131 @@ sub acceptitem {
     }
 
     return $response;
+}
+
+=head2 checkinitem
+
+    $response = $ils->checkinitem($request);
+
+Checks the item in if we can find the barcode in the message. It
+returns problems if it cannot find the item in the system or if the
+item is not checked out.
+
+It could definitely use some more brains at some point as it does not
+fully support everything that the standard allows. It also does not
+really check if the checkin succeeded or not.
+
+=cut
+
+sub checkinitem {
+    my $self = shift;
+    my $request = shift;
+
+    # Check our session and login if necessary:
+    $self->login() unless ($self->checkauth());
+
+    # Common stuff:
+    my $message = $self->parse_request_type($request);
+    my $response = NCIP::Response->new({type => $message . 'Response'});
+    $response->header($self->make_header($request));
+
+    # We need the copy barcode from the message.
+    my ($item_barcode, $item_idfield) = $self->find_item_barcode($request);
+    if (ref($item_barcode) eq 'NCIP::Problem') {
+        $response->problem($item_barcode);
+        return $response;
+    }
+
+    # Retrieve the copy details.
+    my $details = $self->retrieve_copy_details_by_barcode($item_barcode);
+    unless ($details) {
+        # Return an Unkown Item problem unless we find the copy.
+        $response->problem(
+            NCIP::Problem->new(
+                {
+                    ProblemType => 'Unknown Item',
+                    ProblemDetail => "Item with barcode $barcode is not known.",
+                    ProblemElement => $item_idfield,
+                    ProblemValue => $item_barcode
+                }
+            )
+        );
+        return $response;
+    }
+
+    # Look for a circulation and examine its information:
+    my $circ = $details->{circ};
+    if (!$circ || $circ->checkin_time()) {
+        # Item isn't checked out.
+        $response->problem(
+            NCIP::Problem->new(
+                {
+                    ProblemType => 'Item Not Checked Out',
+                    ProblemDetail => "Item with barcode $barcode not checkout out.",
+                    ProblemElement => $item_idfield,
+                    ProblemValue => $item_barcode
+                }
+            )
+        );
+    } else {
+        # Isolate the copy.
+        my $copy = $details->{copy};
+
+        # Get data on the patron who has it checked out.
+        my $user = $self->retrieve_user_by_id($details->{circ}->usr());
+
+        # At some point in the future, we should probably check if the
+        # request contains a user barcode. We would then look that
+        # user up, too, and make sure it is the same user that has the
+        # item checked out. If not, we would report a
+        # problem. However, the user id is optional in the CheckInItem
+        # message, and it doesn't look like our target system sends
+        # it.
+
+        # Checkin parameters. We want to skip hold targeting or making
+        # transits, to force the checkin despite the copy status, as
+        # well as void overdues.
+        my $params = {
+            barcode => $copy->barcode(),
+            force => 1,
+            noop => 1,
+            void_overdues => 1
+        };
+        my $result = $U->simplereq(
+            'open-ils.circ',
+            'open-ils.circ.checkin.override',
+            $self->{session}->{authtoken},
+            $params
+        );
+
+        # We should check for errors here, but I'll leave that for
+        # later.
+
+        my $data = {
+            ItemId => NCIP::Item::Id->new(
+                {
+                    AgencyId => $request->{$message}->{ItemId}->{AgencyId},
+                    ItemIdentifierType => $request->{$message}->{ItemId}->{ItemIdentifierType},
+                    ItemIdentifierValue => $request->{$message}->{ItemId}->{ItemIdentifierValue}
+                }
+            ),
+            UserId => NCIP::User::Id->new(
+                {
+                    UserIdentifierType => 'Barcode Id',
+                    UserIdentifierValue => $user->card->barcode()
+                }
+            )
+        };
+
+        $response->data($data);
+
+        # At some point in the future, we should probably check if
+        # they requested optional user or item elements and return
+        # those. For the time being, we ignore those at the risk of
+        # being considered non-compliant.
+    }
+
+    return $response
 }
 
 =head1 METHODS USEFUL to SUBCLASSES
@@ -609,6 +734,37 @@ sub retrieve_user_by_barcode {
     return $result;
 }
 
+=head2 retrieve_user_by_id
+
+    $user = $ils->retrieve_user_by_id($id);
+
+Similar to C<retrieve_user_by_barcode> but takes the user's database
+id rather than barcode. This is useful when you have a circulation or
+hold and need to get information about the user's involved in the hold
+or circulaiton.
+
+It returns a fleshed user on success or undef on failure.
+
+=cut
+
+sub retrieve_user_by_id {
+    my ($self, $id) = @_;
+
+    # Do a fleshed retrieve of the patron, and flesh the fields that
+    # we would normally use.
+    my $result = $U->simplereq(
+        'open-ils.actor',
+        'open-ils.actor.user.fleshed.retrieve',
+        $self->{session}->{authtoken},
+        $id,
+        [ 'card', 'cards', 'standing_penalties', 'addresses', 'home_ou' ]
+    );
+    # Check for an error.
+    undef($result) if ($result && $U->event_code($result));
+
+    return $result;
+}
+
 =head2 check_user_for_problems
 
     $problem = $ils>check_user_for_problems($user, 'HOLD, 'CIRC', 'RENEW');
@@ -670,13 +826,15 @@ sub check_user_for_problems {
     return $problem;
 }
 
-=head2 retrieve_copy_by_barcode
+=head2 retrieve_copy_details_by_barcode
 
-    $copy = $ils->retrieve_copy_by_barcode($copy_barcode);
+    $copy = $ils->retrieve_copy_details_by_barcode($copy_barcode);
 
 Look up and retrieve some copy details by the copy barcode. This
-method returns either a valid copy object or undefined if no copy
-exists with that barcode or if some error occurs.
+method returns either a hashref with the copy details or undefined if
+no copy exists with that barcode or if some error occurs.
+
+The hashref has the fields copy, hold, transit, circ, volume, and mvr.
 
 This method differs from C<retrieve_user_by_barcode> in that a copy
 cannot be invalid if it exists and it is not always an error if no
@@ -685,7 +843,7 @@ there to be no copy.
 
 =cut
 
-sub retrieve_copy_by_barcode {
+sub retrieve_copy_details_by_barcode {
     my $self = shift;
     my $barcode = shift;
 
