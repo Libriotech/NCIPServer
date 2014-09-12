@@ -534,9 +534,18 @@ sub checkinitem {
         return $response;
     }
 
+    # Isolate the copy.
+    my $copy = $details->{copy};
+
     # Look for a circulation and examine its information:
     my $circ = $details->{circ};
-    if (!$circ || $circ->checkin_time()) {
+
+    # Shortcut for the next check.
+    my $ou_id = $self->{session}->{work_ou}->id();
+    # We need to make sure that the copy is checked out, and it was
+    # either created by the NCIP user or checked out at the NCIP
+    # org. unit.
+    if (!$circ || $circ->checkin_time() || ($circ->circ_lib() != $ou_id && $copy->circ_lib() != $ou_id)) {
         # Item isn't checked out.
         $response->problem(
             NCIP::Problem->new(
@@ -549,11 +558,8 @@ sub checkinitem {
             )
         );
     } else {
-        # Isolate the copy.
-        my $copy = $details->{copy};
-
         # Get data on the patron who has it checked out.
-        my $user = $self->retrieve_user_by_id($details->{circ}->usr());
+        my $user = $self->retrieve_user_by_id($circ->usr());
 
         # At some point in the future, we should probably check if the
         # request contains a user barcode. We would then look that
