@@ -559,23 +559,23 @@ sub checkinitem {
         );
     } else {
         # Get data on the patron who has it checked out.
-        my $user = $self->retrieve_user_by_id($circ->usr());
+        my $circ_user = $self->retrieve_user_by_id($circ->usr());
 
         # Check if an optional UserId was provided. If so, make sure
         # the copy was checked out to that user. We record the id
         # field to report it as the problem value if the copy is
         # checked out to someone else.
-        my ($circ_usr_barcode, $circ_usr_idfield) = $self->find_user_barcode($request);
-        if (ref($circ_usr_barcode) ne 'NCIP::Problem') {
-            $circ_usr = $self->retrieve_user_by_bacode($circ_user_barcode);
-            if ($circ_usr->id() != $user->id()) {
+        my ($user_barcode, $user_idfield) = $self->find_user_barcode($request);
+        if (ref($user_barcode) ne 'NCIP::Problem') {
+            my $user = $self->retrieve_user_by_bacode($circ_user_barcode);
+            if ($user->id() != $circ_user->id()) {
                 $response->problem(
                     NCIP::Problem->new(
                         {
                             ProblemType => 'Item Not Checked Out To This User',
-                            ProblemDetail => "Item with barcode $item_barcode not checkout out to user with barcode $circ_usr_barcode.",
-                            ProblemElement => $cir_usr_idfield,
-                            ProblemValue => $circ_usr_barcode
+                            ProblemDetail => "Item with barcode $item_barcode not checkout out to user with barcode $user_barcode.",
+                            ProblemElement => $user_idfield,
+                            ProblemValue => $user_barcode
                         }
                     )
                 );
@@ -598,6 +598,12 @@ sub checkinitem {
             $self->{session}->{authtoken},
             $params
         );
+        if ($result->{textcode} eq 'SUCCESS') {
+            # Delete the copy. Since delete_copy checks ownership
+            # before attempting to delete the copy, we don't bother
+            # checking who owns it.
+            $self->delete_copy($copy);
+        }
 
         # We should check for errors here, but I'll leave that for
         # later.
@@ -613,7 +619,7 @@ sub checkinitem {
             UserId => NCIP::User::Id->new(
                 {
                     UserIdentifierType => 'Barcode Id',
-                    UserIdentifierValue => $user->card->barcode()
+                    UserIdentifierValue => $circ_user->card->barcode()
                 }
             )
         };
@@ -1265,6 +1271,106 @@ sub place_hold {
     }
 
     return $hold;
+}
+
+=head2 delete_copy
+
+    $ils->delete_copy($copy);
+
+Deletes the copy, and if it is owned by our work_ou and not a precat,
+we also delete the volume and bib on which the copy depends.
+
+=cut
+
+sub delete_copy {
+    my $self = shift;
+    my $copy = shift;
+
+    # Shortcut for ownership checks below.
+    my $ou_id = $self->{session}->{work_ou}->id();
+
+    # First, make sure the copy is not already deleted and we own it.
+    return undef if ($U->is_true($copy->deleted()) || $copy->circ_lib() != $ou_id);
+
+    # We need a transaction & connected session.
+    my $xact;
+    my $session = OpenSRF::AppSession->create('open-ils.pcrud');
+    $session->connect();
+    eval {
+        $xact = $session->request(
+            'open-ils.pcrud.transaction.begin',
+            $self->{session}->{authtoken}
+        )->gather(1);
+    };
+    if ($@) {
+        undef($xact);
+    }
+
+    if ($xact) {
+        # Do the rest in one eval block.
+        eval {
+            # Delete the copy.
+            my $r = $session->request(
+                'open-ils.pcrud.delete.acp',
+                $self->{session}->{authtoken},
+                $copy
+            )->gather(1);
+            # Check for volume.
+            if ($copy->call_number() != -1) {
+                # Retrieve the acn object and flesh the bib.
+                my $acn = $session->request(
+                    'open-ils.pcrud.retrieve.acn',
+                    $self->{session}->{authtoken},
+                    $copy->call_number(),
+                    {flesh => 1, flesh_fields => {acn => ['record']}}
+                )->gather(1);
+                if ($acn) {
+                    # Get the bib and deflesh the acn.
+                    my $bib = $acn->record();
+                    $acn->record($bib->id());
+                    # Check if we own the call_number.
+                    if ($acn->owning_lib() == $ou_id) {
+                        $r = $session->request(
+                            'open-ils.pcrud.delete.acn',
+                            $self->{session}->{authtoken},
+                            $acn
+                        )->gather(1);
+                        if ($r) {
+                            # Check if we created the bib.
+                            if ($bib->creator() == $self->{session}->{user}->id()) {
+                                $r = $session->request(
+                                    'open-ils.pcrud.delete.bre',
+                                    $self->{session}->{authtoken},
+                                    $bib
+                                )->gather(1);
+                            }
+                            # We should probably check for other call
+                            # numbers on the bib, first, but no one
+                            # else should be using the bib
+                            # record. We'll add that check if it ever
+                            # happens in the real world.
+                        }
+                    }
+                }
+            }
+            $r = $session->request(
+                'open-ils.pcrud.transaction.commit',
+                $self->{session}->{authtoken}
+            )->gather(1);
+        };
+        if ($@) {
+            eval {
+                my $r = $session->request(
+                    'open-ils.pcrud.transaction.rollback',
+                    $self->{session}->{authtoken}
+                )->gather(1);
+            }
+        }
+    }
+
+    $session->disconnect();
+
+    return undef;
 }
 
 =head1 OVERRIDDEN PARENT METHODS
