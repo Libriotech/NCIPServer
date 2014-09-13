@@ -1327,7 +1327,7 @@ sub delete_copy {
                     'open-ils.pcrud.retrieve.acn',
                     $self->{session}->{authtoken},
                     $copy->call_number(),
-                    {flesh => 1, flesh_fields => {acn => ['record']}}
+                    {flesh => 2, flesh_fields => {acn => ['record'], bre => ['call_numbers']}}
                 )->gather(1);
                 if ($acn) {
                     # Get the bib and deflesh the acn.
@@ -1343,17 +1343,16 @@ sub delete_copy {
                         if ($r) {
                             # Check if we created the bib.
                             if ($bib->creator() == $self->{session}->{user}->id()) {
-                                $r = $session->request(
-                                    'open-ils.pcrud.delete.bre',
-                                    $self->{session}->{authtoken},
-                                    $bib
-                                )->gather(1);
+                                # Check for other call numbers on the bib:
+                                my @vols = map {$_->id() != $acn->id() && !$U->is_true($_->deleted())} @{$bib->call_numbers()};
+                                unless (@vols) {
+                                    $r = $session->request(
+                                        'open-ils.pcrud.delete.bre',
+                                        $self->{session}->{authtoken},
+                                        $bib
+                                    )->gather(1);
+                                }
                             }
-                            # We should probably check for other call
-                            # numbers on the bib, first, but no one
-                            # else should be using the bib
-                            # record. We'll add that check if it ever
-                            # happens in the real world.
                         }
                     }
                 }
