@@ -567,7 +567,7 @@ sub checkinitem {
         # checked out to someone else.
         my ($user_barcode, $user_idfield) = $self->find_user_barcode($request);
         if (ref($user_barcode) ne 'NCIP::Problem') {
-            my $user = $self->retrieve_user_by_bacode($circ_user_barcode);
+            my $user = $self->retrieve_user_by_bacode($user_barcode);
             if ($user->id() != $circ_user->id()) {
                 $response->problem(
                     NCIP::Problem->new(
