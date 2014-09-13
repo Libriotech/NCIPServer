@@ -1297,6 +1297,12 @@ sub delete_copy {
     # First, make sure the copy is not already deleted and we own it.
     return undef if ($U->is_true($copy->deleted()) || $copy->circ_lib() != $ou_id);
 
+    # If call_number was fleshed, deflesh it.
+    if (ref($copy->call_number())) {
+        my $cn = $copy->call_number();
+        $copy->call_number($cn->id());
+    }
+
     # We need a transaction & connected session.
     my $xact;
     my $session = OpenSRF::AppSession->create('open-ils.pcrud');
