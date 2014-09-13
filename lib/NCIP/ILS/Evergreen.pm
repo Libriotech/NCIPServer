@@ -1121,7 +1121,11 @@ sub create_fuller_copy {
             $item->call_number($acn->id());
             $item->circ_lib($self->{session}->{work_ou}->id);
             $item->circulate('t');
-            $item->holdable('t');
+            if ($self->{config}->{items}->{use_force_holds}) {
+                $item->holdable('f');
+            } else {
+                $item->holdable('t');
+            }
             $item->opac_visible('f');
             $item->deleted('f');
             $item->fine_level(OILS_PRECAT_COPY_FINE_LEVEL);
@@ -1230,9 +1234,10 @@ sub place_hold {
     $params = { pickup_lib => $location->id(), patronid => $user->id() };
 
     if (ref($item) eq 'Fieldmapper::asset::copy') {
-        $hold->hold_type('C');
+        my $type = ($self->{config}->{items}->{use_force_holds}) ? 'F' : 'C';
+        $hold->hold_type($type);
         $hold->current_copy($item->id());
-        $params->{hold_type} = 'C';
+        $params->{hold_type} = $type;
         $params->{copy_id} = $item->id();
     } elsif (ref($item) eq 'Fieldmapper::asset::call_number') {
         $hold->hold_type('V');
