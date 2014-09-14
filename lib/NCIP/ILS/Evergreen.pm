@@ -1818,23 +1818,60 @@ sub _expired {
 }
 
 # Creates a NCIP Problem from an event. Takes a string for the problem
-# type, the event hashref, and optional arguments for the
-# ProblemElement and ProblemValue fields.
+# type, the event hashref (or a string to use for the detail), and
+# optional arguments for the ProblemElement and ProblemValue fields.
 sub _problem_from_event {
     my ($type, $evt, $element, $value) = @_;
 
     my $detail;
 
-    # This block will likely need to get smarter in the near future.
-    if ($evt) {
-        if ($evt->{textcode} eq 'PERM_FAILURE') {
-            $detail = 'Permission Failure: ' . $evt->{ilsperm};
-            $detail =~ s/\.override$//;
-        } else {
-            $detail = 'ILS returned ' . $evt->{textcode} . ' error.';
+    # Check the event.
+    if (ref($evt)) {
+        my ($textcode, $desc);
+
+        # Get the textcode, if available. We favor those defined in
+        # ils_events.xml over those made up on the fly.
+        if ($evt->{ilsevent} && $evt->{ilsevent}->{textcode}) {
+            $textcode = $evt->{ilsevent}->{textcode};
+        } elsif ($evt->{textcode}) {
+            $textcode = $evt->{textcode};
         }
+
+        # Get the description. We favor translated descriptions over
+        # the English in ils_events.xml.
+        if ($evt->{desc}) {
+            $desc = $evt->{desc};
+        } elsif ($evt->{ilsevent} && $evt->{ilsevent}->{desc}) {
+            $desc = $evt->{ilsevent}->{desc};
+        }
+
+        # Check if $type was set. As an "undocumented" feature, you
+        # can pass undef, and we'll use the textcode from the event.
+        unless ($type) {
+            if ($textcode) {
+                $type = $textcode;
+            } else {
+                # Because we have to give them something.
+                $type = 'Temporary Processing Failure';
+            }
+        }
+
+        # Set the detail from some combination of the above.
+        if ($desc) {
+            $detail = $desc;
+        } elsif ($textcode eq 'PERM_FAILURE') {
+            if ($evt->{ilsperm}) {
+                $detail = "Permission denied: " . $evt->{ilsperm};
+                $detail =~ s/\.override$//;
+            }
+        } elsif ($textcode) {
+            $detail = "ILS returned $textcode error.";
+        } else {
+            $detail = 'Detail not available.';
+        }
+
     } else {
-        $detail = 'Detail not available.';
+        $detail = $evt;
     }
 
     return NCIP::Problem->new(
