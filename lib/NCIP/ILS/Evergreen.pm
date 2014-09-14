@@ -575,7 +575,7 @@ sub checkinitem {
     # transits, to force the checkin despite the copy status, as
     # well as void overdues.
     my $params = {
-        barcode => $copy->barcode(),
+        copy_barcode => $copy->barcode(),
         force => 1,
         noop => 1,
         void_overdues => 1
@@ -586,40 +586,41 @@ sub checkinitem {
         $self->{session}->{authtoken},
         $params
     );
+    if (ref($result) eq 'ARRAY') {
+        $result = $result->[0];
+    }
     if ($result->{textcode} eq 'SUCCESS') {
         # Delete the copy. Since delete_copy checks ownership
         # before attempting to delete the copy, we don't bother
         # checking who owns it.
         $self->delete_copy($copy);
+        # We need the circulation user for the information below, so we retrieve it.
+        my $circ_user = $self->retrieve_user_by_id($circ->usr());
+        my $data = {
+            ItemId => NCIP::Item::Id->new(
+                {
+                    AgencyId => $request->{$message}->{ItemId}->{AgencyId},
+                    ItemIdentifierType => $request->{$message}->{ItemId}->{ItemIdentifierType},
+                    ItemIdentifierValue => $request->{$message}->{ItemId}->{ItemIdentifierValue}
+                }
+            ),
+            UserId => NCIP::User::Id->new(
+                {
+                    UserIdentifierType => 'Barcode Id',
+                    UserIdentifierValue => $circ_user->card->barcode()
+                }
+            )
+        };
+
+        $response->data($data);
+
+        # At some point in the future, we should probably check if
+        # they requested optional user or item elements and return
+        # those. For the time being, we ignore those at the risk of
+        # being considered non-compliant.
+    } else {
+        $response->problem(_problem_from_event('Checkin Failed', $result));
     }
-
-    # We should check for errors here, but I'll leave that for
-    # later.
-
-    # We need the circulation user for the information below, so we retrieve it.
-    my $circ_user = $self->retrieve_user_by_id($circ->usr());
-    my $data = {
-        ItemId => NCIP::Item::Id->new(
-            {
-                AgencyId => $request->{$message}->{ItemId}->{AgencyId},
-                ItemIdentifierType => $request->{$message}->{ItemId}->{ItemIdentifierType},
-                ItemIdentifierValue => $request->{$message}->{ItemId}->{ItemIdentifierValue}
-            }
-        ),
-        UserId => NCIP::User::Id->new(
-            {
-                UserIdentifierType => 'Barcode Id',
-                UserIdentifierValue => $circ_user->card->barcode()
-            }
-        )
-    };
-
-    $response->data($data);
-
-    # At some point in the future, we should probably check if
-    # they requested optional user or item elements and return
-    # those. For the time being, we ignore those at the risk of
-    # being considered non-compliant.
 
     return $response
 }
