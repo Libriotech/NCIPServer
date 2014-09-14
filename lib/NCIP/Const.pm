@@ -24,5 +24,8 @@ use constant SUPPORTED_VERSIONS => (
     'http://www.niso.org/schemas/ncip/v2_02/ncip_v2_02.xsd',
 );
 
-
+# Messages for which AuthenticationInput are valid.
+use constant AUTHENTICATIONINPUT_MESSAGES => (
+    'LookUpUser', 'RenewItem', 'CheckOutItem', 'RequestItem',
+);
 1;
