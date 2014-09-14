@@ -1500,7 +1500,7 @@ sub place_hold {
         }
     } elsif ($r->{last_event}) {
         $hold = _problem_from_event('Request Not Possible', $r->{last_event});
-    } elsif ($r->{text_code}) {
+    } elsif ($r->{textcode}) {
         $hold = _problem_from_event('Request Not Possible', $r);
     } else {
         $hold = _problem_from_event('Request Not Possible');
@@ -1827,11 +1827,11 @@ sub _problem_from_event {
 
     # This block will likely need to get smarter in the near future.
     if ($evt) {
-        if ($evt->{text_code} eq 'PERM_FAILURE') {
+        if ($evt->{textcode} eq 'PERM_FAILURE') {
             $detail = 'Permission Failure: ' . $evt->{ilsperm};
             $detail =~ s/\.override$//;
         } else {
-            $detail = 'ILS returned ' . $evt->{text_code} . ' error.';
+            $detail = 'ILS returned ' . $evt->{textcode} . ' error.';
         }
     } else {
         $detail = 'Detail not available.';
