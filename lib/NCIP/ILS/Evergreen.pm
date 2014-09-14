@@ -596,6 +596,8 @@ sub checkinitem {
     # We should check for errors here, but I'll leave that for
     # later.
 
+    # We need the circulation user for the information below, so we retrieve it.
+    my $circ_user = $self->retrieve_user_by_id($circ->usr());
     my $data = {
         ItemId => NCIP::Item::Id->new(
             {
@@ -871,7 +873,7 @@ sub check_circ_details {
         return NCIP::Problem->new(
             {
                 ProblemType => 'Item Not Checked Out',
-                ProblemDetail => "Item with barcode $item_barcode not checkout out.",
+                ProblemDetail => 'Item with barcode ' . $copy->barcode() . ' is not checked out.',
                 ProblemValue => $copy->barcode()
             }
         );
@@ -884,7 +886,7 @@ sub check_circ_details {
             return NCIP::Problem->new(
                 {
                     ProblemType => 'Item Not Checked Out To This User',
-                    ProblemDetail => "Item with barcode $item_barcode not checkout out to user with barcode $user_barcode."
+                    ProblemDetail => 'Item with barcode ' . $copy->barcode() . ' is not checked out to this user.',
                 }
             );
         }
