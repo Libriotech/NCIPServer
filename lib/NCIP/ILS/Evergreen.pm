@@ -534,103 +534,90 @@ sub checkinitem {
         return $response;
     }
 
+    # Check if a UserId was provided. If so, this is the patron to
+    # whom the copy should be checked out.
+    my $user;
+    my ($user_barcode, $user_idfield) = $self->find_user_barcode($request);
+    # We ignore the problem, because the UserId is optional.
+    if (ref($user_barcode) ne 'NCIP::Problem') {
+        $user = $self->retrieve_user_by_barcode($user_barcode, $user_idfield);
+        # We don't ignore a problem here, however.
+        if (ref($user) eq 'NCIP::Problem') {
+            $response->problem($user);
+            return $response;
+        }
+    }
+
     # Isolate the copy.
     my $copy = $details->{copy};
 
     # Look for a circulation and examine its information:
     my $circ = $details->{circ};
 
-    # Shortcut for the next check.
-    my $ou_id = $self->{session}->{work_ou}->id();
-    # We need to make sure that the copy is checked out, and it was
-    # either created by the NCIP user or checked out at the NCIP
-    # org. unit.
-    if (!$circ || $circ->checkin_time() || ($circ->circ_lib() != $ou_id && $copy->circ_lib() != $ou_id)) {
-        # Item isn't checked out.
-        $response->problem(
-            NCIP::Problem->new(
-                {
-                    ProblemType => 'Item Not Checked Out',
-                    ProblemDetail => "Item with barcode $item_barcode not checkout out.",
-                    ProblemElement => $item_idfield,
-                    ProblemValue => $item_barcode
-                }
-            )
-        );
-    } else {
-        # Get data on the patron who has it checked out.
-        my $circ_user = $self->retrieve_user_by_id($circ->usr());
-
-        # Check if an optional UserId was provided. If so, make sure
-        # the copy was checked out to that user. We record the id
-        # field to report it as the problem value if the copy is
-        # checked out to someone else.
-        my ($user_barcode, $user_idfield) = $self->find_user_barcode($request);
-        if (ref($user_barcode) ne 'NCIP::Problem') {
-            my $user = $self->retrieve_user_by_bacode($user_barcode);
-            if ($user->id() != $circ_user->id()) {
-                $response->problem(
-                    NCIP::Problem->new(
-                        {
-                            ProblemType => 'Item Not Checked Out To This User',
-                            ProblemDetail => "Item with barcode $item_barcode not checkout out to user with barcode $user_barcode.",
-                            ProblemElement => $user_idfield,
-                            ProblemValue => $user_barcode
-                        }
-                    )
-                );
-                return $response; # Short circuit
-            }
+    # Check the circ details to see if the copy is checked out and, if
+    # the patron was provided, that it is checked out to the patron in
+    # question. We also verify the copy ownership and circulation
+    # location.
+    my $problem = $self->check_circ_details($circ, $copy, $user);
+    if ($problem) {
+        # We need to fill in some information, however.
+        if (!$problem->ProblemValue() && !$problem->ProblemElement()) {
+            $problem->ProblemValue($user_barcode);
+            $problem->ProblemValue($user_idfield);
+        } elsif (!$problem->ProblemElement()) {
+            $problem->ProblemElement($item_idfield);
         }
-
-        # Checkin parameters. We want to skip hold targeting or making
-        # transits, to force the checkin despite the copy status, as
-        # well as void overdues.
-        my $params = {
-            barcode => $copy->barcode(),
-            force => 1,
-            noop => 1,
-            void_overdues => 1
-        };
-        my $result = $U->simplereq(
-            'open-ils.circ',
-            'open-ils.circ.checkin.override',
-            $self->{session}->{authtoken},
-            $params
-        );
-        if ($result->{textcode} eq 'SUCCESS') {
-            # Delete the copy. Since delete_copy checks ownership
-            # before attempting to delete the copy, we don't bother
-            # checking who owns it.
-            $self->delete_copy($copy);
-        }
-
-        # We should check for errors here, but I'll leave that for
-        # later.
-
-        my $data = {
-            ItemId => NCIP::Item::Id->new(
-                {
-                    AgencyId => $request->{$message}->{ItemId}->{AgencyId},
-                    ItemIdentifierType => $request->{$message}->{ItemId}->{ItemIdentifierType},
-                    ItemIdentifierValue => $request->{$message}->{ItemId}->{ItemIdentifierValue}
-                }
-            ),
-            UserId => NCIP::User::Id->new(
-                {
-                    UserIdentifierType => 'Barcode Id',
-                    UserIdentifierValue => $circ_user->card->barcode()
-                }
-            )
-        };
-
-        $response->data($data);
-
-        # At some point in the future, we should probably check if
-        # they requested optional user or item elements and return
-        # those. For the time being, we ignore those at the risk of
-        # being considered non-compliant.
+        $response->problem($problem);
+        return $response;
     }
+
+    # Checkin parameters. We want to skip hold targeting or making
+    # transits, to force the checkin despite the copy status, as
+    # well as void overdues.
+    my $params = {
+        barcode => $copy->barcode(),
+        force => 1,
+        noop => 1,
+        void_overdues => 1
+    };
+    my $result = $U->simplereq(
+        'open-ils.circ',
+        'open-ils.circ.checkin.override',
+        $self->{session}->{authtoken},
+        $params
+    );
+    if ($result->{textcode} eq 'SUCCESS') {
+        # Delete the copy. Since delete_copy checks ownership
+        # before attempting to delete the copy, we don't bother
+        # checking who owns it.
+        $self->delete_copy($copy);
+    }
+
+    # We should check for errors here, but I'll leave that for
+    # later.
+
+    my $data = {
+        ItemId => NCIP::Item::Id->new(
+            {
+                AgencyId => $request->{$message}->{ItemId}->{AgencyId},
+                ItemIdentifierType => $request->{$message}->{ItemId}->{ItemIdentifierType},
+                ItemIdentifierValue => $request->{$message}->{ItemId}->{ItemIdentifierValue}
+            }
+        ),
+        UserId => NCIP::User::Id->new(
+            {
+                UserIdentifierType => 'Barcode Id',
+                UserIdentifierValue => $circ_user->card->barcode()
+            }
+        )
+    };
+
+    $response->data($data);
+
+    # At some point in the future, we should probably check if
+    # they requested optional user or item elements and return
+    # those. For the time being, we ignore those at the risk of
+    # being considered non-compliant.
 
     return $response
 }
@@ -850,6 +837,60 @@ sub check_user_for_problems {
     }
 
     return $problem;
+}
+
+=head2 check_circ_details
+
+    $problem = $ils->check_circ_details($circ, $copy, $user);
+
+Checks if we can checkin or renew a circulation. That is, the
+circulation is still open (i.e. the copy is still checked out), if we
+either own the copy or are the circulation location, and if the
+circulation is for the optional $user argument. $circ and $copy are
+required. $user is optional.
+
+Returns a problem if any of the above conditions fail. Returns undef
+if they pass and we can proceed with the checkin or renewal.
+
+If the failure occurred on the copy-related checks, then the
+ProblemElement field will be undefined and needs to be filled in with
+the item id field name. If the check for the copy being checked out to
+the provided user fails, then both ProblemElement and ProblemValue
+fields will be empty and need to be filled in by the caller.
+
+=cut
+
+sub check_circ_details {
+    my ($self, $circ, $copy, $user) = @_;
+
+    # Shortcut for the next check.
+    my $ou_id = $self->{session}->{work_ou}->id();
+
+    if (!$circ || $circ->checkin_time() || ($circ->circ_lib() != $ou_id && $copy->circ_lib() != $ou_id)) {
+        # Item isn't checked out.
+        return NCIP::Problem->new(
+            {
+                ProblemType => 'Item Not Checked Out',
+                ProblemDetail => "Item with barcode $item_barcode not checkout out.",
+                ProblemValue => $copy->barcode()
+            }
+        );
+    } else {
+        # Get data on the patron who has it checked out.
+        my $circ_user = $self->retrieve_user_by_id($circ->usr());
+        if ($user && $circ_user && $user->id() != $circ_user->id()) {
+            # The ProblemElement and ProblemValue field need to be
+            # filled in by the caller.
+            return NCIP::Problem->new(
+                {
+                    ProblemType => 'Item Not Checked Out To This User',
+                    ProblemDetail => "Item with barcode $item_barcode not checkout out to user with barcode $user_barcode."
+                }
+            );
+        }
+    }
+    # If we get here, we're good to go.
+    return undef;
 }
 
 =head2 retrieve_copy_details_by_barcode
