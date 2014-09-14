@@ -324,26 +324,12 @@ sub find_user_barcode {
     my $field;
     my $message = $self->parse_request_type($request);
 
-    # Check for UserId first because it is more common and still valid
-    # in LookupUser.
+    # Check for UserId first because it is more common and valid
+    # in most messages.
     my $authinput = $request->{$message}->{UserId};
     if ($authinput) {
         $field = 'UserIdentifierValue';
-        if (ref $authinput ne 'ARRAY') {
-            $authinput = [$authinput];
-        }
-        foreach my $input (@$authinput) {
-            # UserIdentifierType is optional, so we check if it is
-            # there. If it is, we skip this entry unless the
-            # identifier type contains the string barcode
-            if ($input->{UserIdentifierType}) {
-                next unless ($input->{UserIdentifierType} =~ /barcode/i);
-            }
-            # We take the first field we find, unless the
-            # identifier type says it is not a barcode.
-            $barcode = $input->{$field};
-            last;
-        }
+        $barcode = $authinput->{$field};
     } elsif ($message eq 'LookupUser') {
         $field = 'AuthenticationInputData';
         $authinput = $request->{$message}->{AuthenticationInput};
