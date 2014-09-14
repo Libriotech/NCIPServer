@@ -1333,30 +1333,34 @@ sub delete_copy {
                     'open-ils.pcrud.retrieve.acn',
                     $self->{session}->{authtoken},
                     $copy->call_number(),
-                    {flesh => 2, flesh_fields => {acn => ['record'], bre => ['call_numbers']}}
+                    {flesh => 2, flesh_fields => {acn => ['record','copies'], bre => ['call_numbers']}}
                 )->gather(1);
                 if ($acn) {
-                    # Get the bib and deflesh the acn.
-                    my $bib = $acn->record();
-                    $acn->record($bib->id());
                     # Check if we own the call_number.
                     if ($acn->owning_lib() == $ou_id) {
-                        $r = $session->request(
-                            'open-ils.pcrud.delete.acn',
-                            $self->{session}->{authtoken},
-                            $acn
-                        )->gather(1);
-                        if ($r) {
-                            # Check if we created the bib.
-                            if ($bib->creator() == $self->{session}->{user}->id()) {
+                        # check for additional copies on the acn.
+                        my @copies = grep {$_->id() != $copy->id() && !$U->is_true($_->deleted())} @{$acn->copies()};
+                        unless (@copies) {
+                            # Get the bib
+                            my $bib = $acn->record();
+                            $r = $session->request(
+                                'open-ils.pcrud.delete.acn',
+                                $self->{session}->{authtoken},
+                                $acn
+                            )->gather(1);
+                            if ($r) {
+                                # Check if we created the bib.
+                                if ($bib->creator() == $self->{session}->{user}->id()) {
                                 # Check for other call numbers on the bib:
-                                my @vols = map {$_->id() != $acn->id() && !$U->is_true($_->deleted())} @{$bib->call_numbers()};
-                                unless (@vols) {
-                                    $r = $session->request(
-                                        'open-ils.pcrud.delete.bre',
-                                        $self->{session}->{authtoken},
-                                        $bib
-                                    )->gather(1);
+                                    my @vols = grep {$_->id() != $acn->id() && !$U->is_true($_->deleted())}
+                                        @{$bib->call_numbers()};
+                                    unless (@vols) {
+                                        $r = $session->request(
+                                            'open-ils.pcrud.delete.bre',
+                                            $self->{session}->{authtoken},
+                                            $bib
+                                        )->gather(1);
+                                    }
                                 }
                             }
                         }
