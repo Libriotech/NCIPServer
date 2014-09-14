@@ -1850,9 +1850,6 @@ sub _problem_from_event {
         unless ($type) {
             if ($textcode) {
                 $type = $textcode;
-            } else {
-                # Because we have to give them something.
-                $type = 'Temporary Processing Failure';
             }
         }
 
@@ -1876,8 +1873,8 @@ sub _problem_from_event {
 
     return NCIP::Problem->new(
         {
-            ProblemType => $type,
-            ProblemDetail => $detail,
+            ProblemType => ($type) ? $type : 'Temporary Processing Failure',
+            ProblemDetail => ($detail) ? $detail : 'Detail not available.',
             ProblemElement => ($element) ? $element : 'NULL',
             ProblemValue => ($value) ? $value : 'NULL'
         }
