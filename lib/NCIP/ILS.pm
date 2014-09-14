@@ -324,13 +324,12 @@ sub find_user_barcode {
     my $field;
     my $message = $self->parse_request_type($request);
 
-    # Check for UserId first because it is more common and valid
-    # in most messages.
+    # Check for UserId first because it is valid in all messages.
     my $authinput = $request->{$message}->{UserId};
     if ($authinput) {
         $field = 'UserIdentifierValue';
         $barcode = $authinput->{$field};
-    } elsif ($message eq 'LookupUser') {
+    } elsif (grep {$_ eq $message} NCIP::Const::AUTHENTICATIONINPUT_MESSAGES) {
         $field = 'AuthenticationInputData';
         $authinput = $request->{$message}->{AuthenticationInput};
         # Convert to array ref if it isn't already.
