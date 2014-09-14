@@ -624,6 +624,193 @@ sub checkinitem {
     return $response
 }
 
+=head2 renewitem
+
+    $response = $ils->renewitem($request);
+
+Handle the RenewItem message.
+
+=cut
+
+sub renewitem {
+    my $self = shift;
+    my $request = shift;
+
+    # Check our session and login if necessary:
+    $self->login() unless ($self->checkauth());
+
+    # Common stuff:
+    my $message = $self->parse_request_type($request);
+    my $response = NCIP::Response->new({type => $message . 'Response'});
+    $response->header($self->make_header($request));
+
+    # We need the copy barcode from the message.
+    my ($item_barcode, $item_idfield) = $self->find_item_barcode($request);
+    if (ref($item_barcode) eq 'NCIP::Problem') {
+        $response->problem($item_barcode);
+        return $response;
+    }
+
+    # Retrieve the copy details.
+    my $details = $self->retrieve_copy_details_by_barcode($item_barcode);
+    unless ($details) {
+        # Return an Unkown Item problem unless we find the copy.
+        $response->problem(
+            NCIP::Problem->new(
+                {
+                    ProblemType => 'Unknown Item',
+                    ProblemDetail => "Item with barcode $item_barcode is not known.",
+                    ProblemElement => $item_idfield,
+                    ProblemValue => $item_barcode
+                }
+            )
+        );
+        return $response;
+    }
+
+    # User is required for RenewItem.
+    my ($user_barcode, $user_idfield) = $self->find_user_barcode($request);
+    if (ref($user_barcode) eq 'NCIP::Problem') {
+        $response->problem($user_barcode);
+        return $response;
+    }
+    my $user = $self->retrieve_user_by_barcode($user_barcode, $user_idfield);
+    if (ref($user) eq 'NCIP::Problem') {
+        $response->problem($user);
+        return $response;
+    }
+
+    # Isolate the copy.
+    my $copy = $details->{copy};
+
+    # Look for a circulation and examine its information:
+    my $circ = $details->{circ};
+
+    # Check the circ details to see if the copy is checked out and, if
+    # the patron was provided, that it is checked out to the patron in
+    # question. We also verify the copy ownership and circulation
+    # location.
+    my $problem = $self->check_circ_details($circ, $copy, $user);
+    if ($problem) {
+        # We need to fill in some information, however.
+        if (!$problem->ProblemValue() && !$problem->ProblemElement()) {
+            $problem->ProblemValue($user_barcode);
+            $problem->ProblemElement($user_idfield);
+        } elsif (!$problem->ProblemElement()) {
+            $problem->ProblemElement($item_idfield);
+        }
+        $response->problem($problem);
+        return $response;
+    }
+
+    # Check if user is blocked from renewals:
+    $problem = $self->check_user_for_problems($user, 'RENEW');
+    if ($problem) {
+        # Replace the ProblemElement and ProblemValue fields.
+        $problem->ProblemElement($user_idfield);
+        $problem->ProblemValue($user_barcode);
+        $response->problem($problem);
+        return $response;
+    }
+
+    # Check if the duration rule allows renewals. It should have been
+    # fleshed during the copy details retrieve.
+    my $rule = $circ->duration_rule();
+    unless (ref($rule)) {
+        $rule = $U->simplereq(
+            'open-ils.pcrud',
+            'open-ils.pcrud.retrieve.crcd',
+            $self->{session}->{authtoken},
+            $rule
+        )->gather(1);
+    }
+    if ($rule->max_renewals() < 1) {
+        $response->problem(
+            NCIP::Problem->new(
+                {
+                    ProblemType => 'Item Not Renewable',
+                    ProblemDetail => 'Item may not be renewed.',
+                    ProblemElement => $item_idfield,
+                    ProblemValue => $item_barcode
+                }
+            )
+        );
+        return $response;
+    }
+
+    # Check if there are renewals remaining on the latest circ:
+    if ($circ->renewal_remaining() < 1) {
+        $response->problem(
+            NCIP::Problem->new(
+                {
+                    ProblemType => 'Maximum Renewals Exceeded',
+                    ProblemDetail => 'Renewal cannot proceed because the User has already renewed the Item the maximum number of times permitted.',
+                    ProblemElement => $item_idfield,
+                    ProblemValue => $item_barcode
+                }
+            )
+        );
+        return $response;
+    }
+
+    # Now, we attempt the renewal. If it fails, we simply say that the
+    # user is not allowed to renew this item, without getting into
+    # details.
+    my $params = {
+        copy => $copy,
+        patron_id => $user->id(),
+        sip_renewal => 1
+    };
+    my $r = $U->simplereq(
+        'open-ils.circ',
+        'open-ils.circ.renew.override',
+        $self->{session}->{authtoken},
+        $params
+    )->gather(1);
+
+    # We only look at the first one, since more than one usually means
+    # failure.
+    if (ref($r) eq 'ARRAY') {
+        $r = $r->[0];
+    }
+    if ($r->{textcode} ne 'SUCCESS') {
+        $problem = _problem_from_event('Renewal Failed', $r);
+        $response->problem($problem);
+    } else {
+        my $data = {
+            ItemId => NCIP::Item::Id->new(
+                {
+                    AgencyId => $request->{$message}->{ItemId}->{AgencyId},
+                    ItemIdentifierType => $request->{$message}->{ItemId}->{ItemIdentifierType},
+                    ItemIdentifierValue => $request->{$message}->{ItemId}->{ItemIdentifierValue}
+                }
+            ),
+            UserId => NCIP::User::Id->new(
+                {
+                    UserIdentifierType => 'Barcode Id',
+                    UserIdentifierValue => $user->card->barcode()
+                }
+            )
+        };
+        # We need to retrieve the copy details again to refresh our
+        # circ information to get the new due date.
+        $details = $self->retrieve_copy_details_by_barcode($item_barcode);
+        $circ = $details->{circ};
+        my $due = DateTime::Format::ISO8601->parse_datetime(cleanse_ISO8601($circ->due_date()));
+        $due->set_timezone('UTC');
+        $data->{DateDue} = $due->iso8601();
+
+        $response->data($data);
+    }
+
+    # At some point in the future, we should probably check if
+    # they requested optional user or item elements and return
+    # those. For the time being, we ignore those at the risk of
+    # being considered non-compliant.
+
+    return $response;
+}
+
 =head1 METHODS USEFUL to SUBCLASSES
 
 =head2 login
