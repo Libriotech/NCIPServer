@@ -563,7 +563,7 @@ sub checkinitem {
         # We need to fill in some information, however.
         if (!$problem->ProblemValue() && !$problem->ProblemElement()) {
             $problem->ProblemValue($user_barcode);
-            $problem->ProblemValue($user_idfield);
+            $problem->ProblemElement($user_idfield);
         } elsif (!$problem->ProblemElement()) {
             $problem->ProblemElement($item_idfield);
         }
