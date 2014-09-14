@@ -798,7 +798,7 @@ sub renewitem {
         $details = $self->retrieve_copy_details_by_barcode($item_barcode);
         $circ = $details->{circ};
         my $due = DateTime::Format::ISO8601->parse_datetime(cleanse_ISO8601($circ->due_date()));
-        $due->set_timezone('UTC');
+        $due->set_time_zone('UTC');
         $data->{DateDue} = $due->iso8601();
 
         $response->data($data);
