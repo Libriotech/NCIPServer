@@ -1528,92 +1528,20 @@ sub delete_copy {
     # First, make sure the copy is not already deleted and we own it.
     return undef if ($U->is_true($copy->deleted()) || $copy->circ_lib() != $ou_id);
 
-    # If call_number was fleshed, deflesh it.
-    if (ref($copy->call_number())) {
-        my $cn = $copy->call_number();
-        $copy->call_number($cn->id());
-    }
+    # Indicate we want to delete the copy.
+    $copy->isdeleted(1);
 
-    # We need a transaction & connected session.
-    my $xact;
-    my $session = OpenSRF::AppSession->create('open-ils.pcrud');
-    $session->connect();
-    eval {
-        $xact = $session->request(
-            'open-ils.pcrud.transaction.begin',
-            $self->{session}->{authtoken}
-        )->gather(1);
-    };
-    if ($@) {
-        undef($xact);
-    }
+    # Delete the copy using a backend call that will delete the copy,
+    # the call number, and bib when appropriate.
+    my $result = $U->simplereq(
+        'open-ils.cat',
+        'open-ils.cat.asset.copy.fleshed.batch.update.override',
+        $self->{session}->{authtoken},
+        [$copy]
+    );
 
-    if ($xact) {
-        # Do the rest in one eval block.
-        eval {
-            # Delete the copy.
-            my $r = $session->request(
-                'open-ils.pcrud.delete.acp',
-                $self->{session}->{authtoken},
-                $copy
-            )->gather(1);
-            # Check for volume.
-            if ($copy->call_number() != -1) {
-                # Retrieve the acn object and flesh the bib.
-                my $acn = $session->request(
-                    'open-ils.pcrud.retrieve.acn',
-                    $self->{session}->{authtoken},
-                    $copy->call_number(),
-                    {flesh => 2, flesh_fields => {acn => ['record','copies'], bre => ['call_numbers']}}
-                )->gather(1);
-                if ($acn) {
-                    # Check if we own the call_number.
-                    if ($acn->owning_lib() == $ou_id) {
-                        # check for additional copies on the acn.
-                        my @copies = grep {$_->id() != $copy->id() && !$U->is_true($_->deleted())} @{$acn->copies()};
-                        unless (@copies) {
-                            # Get the bib
-                            my $bib = $acn->record();
-                            $r = $session->request(
-                                'open-ils.pcrud.delete.acn',
-                                $self->{session}->{authtoken},
-                                $acn
-                            )->gather(1);
-                            if ($r) {
-                                # Check if we created the bib.
-                                if ($bib->creator() == $self->{session}->{user}->id()) {
-                                # Check for other call numbers on the bib:
-                                    my @vols = grep {$_->id() != $acn->id() && !$U->is_true($_->deleted())}
-                                        @{$bib->call_numbers()};
-                                    unless (@vols) {
-                                        $r = $session->request(
-                                            'open-ils.pcrud.delete.bre',
-                                            $self->{session}->{authtoken},
-                                            $bib
-                                        )->gather(1);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            $r = $session->request(
-                'open-ils.pcrud.transaction.commit',
-                $self->{session}->{authtoken}
-            )->gather(1);
-        };
-        if ($@) {
-            eval {
-                my $r = $session->request(
-                    'open-ils.pcrud.transaction.rollback',
-                    $self->{session}->{authtoken}
-                )->gather(1);
-            }
-        }
-    }
-
-    $session->disconnect();
+    # We are currently not checking for succes or failure of the
+    # above. At some point, someone may want to.
 
     return undef;
 }
