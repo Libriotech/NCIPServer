@@ -812,6 +812,165 @@ sub renewitem {
     return $response;
 }
 
+=head2 checkoutitem
+
+    $response = $ils->checkoutitem($request);
+
+Handle the Checkoutitem message.
+
+=cut
+
+sub checkoutitem {
+    my $self = shift;
+    my $request = shift;
+
+    # Check our session and login if necessary:
+    $self->login() unless ($self->checkauth());
+
+    # Common stuff:
+    my $message = $self->parse_request_type($request);
+    my $response = NCIP::Response->new({type => $message . 'Response'});
+    $response->header($self->make_header($request));
+
+    # We need the copy barcode from the message.
+    my ($item_barcode, $item_idfield) = $self->find_item_barcode($request);
+    if (ref($item_barcode) eq 'NCIP::Problem') {
+        $response->problem($item_barcode);
+        return $response;
+    }
+
+    # Retrieve the copy details.
+    my $details = $self->retrieve_copy_details_by_barcode($item_barcode);
+    unless ($details) {
+        # Return an Unkown Item problem unless we find the copy.
+        $response->problem(
+            NCIP::Problem->new(
+                {
+                    ProblemType => 'Unknown Item',
+                    ProblemDetail => "Item with barcode $item_barcode is not known.",
+                    ProblemElement => $item_idfield,
+                    ProblemValue => $item_barcode
+                }
+            )
+        );
+        return $response;
+    }
+
+    # User is required for CheckOutItem.
+    my ($user_barcode, $user_idfield) = $self->find_user_barcode($request);
+    if (ref($user_barcode) eq 'NCIP::Problem') {
+        $response->problem($user_barcode);
+        return $response;
+    }
+    my $user = $self->retrieve_user_by_barcode($user_barcode, $user_idfield);
+    if (ref($user) eq 'NCIP::Problem') {
+        $response->problem($user);
+        return $response;
+    }
+
+    # Isolate the copy.
+    my $copy = $details->{copy};
+
+    # Check if the copy can circulate.
+    unless ($self->copy_can_circulate($copy)) {
+        $reponse->problem(
+            NCIP::Problem->new(
+                {
+                    ProblemType => 'Item Does Not Circulate',
+                    ProblemDetail => "Item with barcode $item_barcode does not circulate.",
+                    ProblemElement => $item_idfield,
+                    ProblemValue => $item_barcode
+                }
+            )
+        );
+        return $response;
+    }
+
+    # Look for a circulation and examine its information:
+    my $circ = $details->{circ};
+
+    # Check if the item is already checked out.
+    if ($circ && !$circ->checkin_time()) {
+        $response->problem(
+            NCIP::Problem->new(
+                {
+                    ProblemType => 'Item Already Checked Out',
+                    ProblemDetail => "Item with barcode $item_barcode is already checked out.",
+                    ProblemElement => $item_idfield,
+                    ProblemValue => $item_barcode
+                }
+            )
+        );
+        return $response;
+    }
+
+    # Check if user is blocked from circulation:
+    my $problem = $self->check_user_for_problems($user, 'CIRC');
+    if ($problem) {
+        # Replace the ProblemElement and ProblemValue fields.
+        $problem->ProblemElement($user_idfield);
+        $problem->ProblemValue($user_barcode);
+        $response->problem($problem);
+        return $response;
+    }
+
+    # Now, we attempt the check out. If it fails, we simply say that
+    # the user is not allowed to check out this item, without getting
+    # into details.
+    my $params = {
+        copy => $copy,
+        patron_id => $user->id(),
+    };
+    my $r = $U->simplereq(
+        'open-ils.circ',
+        'open-ils.circ.checkout.full.override',
+        $self->{session}->{authtoken},
+        $params
+    )->gather(1);
+
+    # We only look at the first one, since more than one usually means
+    # failure.
+    if (ref($r) eq 'ARRAY') {
+        $r = $r->[0];
+    }
+    if ($r->{textcode} ne 'SUCCESS') {
+        $problem = _problem_from_event('Check Out Failed', $r);
+        $response->problem($problem);
+    } else {
+        my $data = {
+            ItemId => NCIP::Item::Id->new(
+                {
+                    AgencyId => $request->{$message}->{ItemId}->{AgencyId},
+                    ItemIdentifierType => $request->{$message}->{ItemId}->{ItemIdentifierType},
+                    ItemIdentifierValue => $request->{$message}->{ItemId}->{ItemIdentifierValue}
+                }
+            ),
+            UserId => NCIP::User::Id->new(
+                {
+                    UserIdentifierType => 'Barcode Id',
+                    UserIdentifierValue => $user->card->barcode()
+                }
+            )
+        };
+        # We need to retrieve the copy details again to refresh our
+        # circ information to get the due date.
+        $details = $self->retrieve_copy_details_by_barcode($item_barcode);
+        $circ = $details->{circ};
+        my $due = DateTime::Format::ISO8601->parse_datetime(cleanse_ISO8601($circ->due_date()));
+        $due->set_time_zone('UTC');
+        $data->{DateDue} = $due->iso8601();
+
+        $response->data($data);
+    }
+
+    # At some point in the future, we should probably check if
+    # they requested optional user or item elements and return
+    # those. For the time being, we ignore those at the risk of
+    # being considered non-compliant.
+
+    return $response;
+}
+
 =head1 METHODS USEFUL to SUBCLASSES
 
 =head2 login
@@ -1140,6 +1299,28 @@ sub retrieve_org_unit_by_shortname {
     );
 
     return $aou;
+}
+
+=head2 retrieve_copy_location
+
+    $location = $ils->retrieve_copy_location($location_id);
+
+Retrive a copy location based on id.
+
+=cut
+
+sub retrieve_copy_location {
+    my $self = shift;
+    my $id = shift;
+
+    my $location = $U->simplereq(
+        'open-ils.pcrud',
+        'open-ils.pcrud.retrieve.acpl',
+        $self->{session}->{authtoken},
+        $id
+    );
+
+    return $location;
 }
 
 =head2 create_precat_copy
@@ -1544,6 +1725,48 @@ sub delete_copy {
     # above. At some point, someone may want to.
 
     return undef;
+}
+
+=head2 copy_can_circulate
+
+    $can_circulate = $ils->copy_can_circulate($copy);
+
+Check if the copy's location and the copy itself allow
+circulation. Return true if they do, and false if they do not.
+
+=cut
+
+sub copy_can_circulate {
+    my $self = shift;
+    my $copy = shift;
+
+    my $location = $copy->location();
+    unless (ref($location)) {
+        $location = $self->retrieve_copy_location($location);
+    }
+
+    return ($U->is_true($copy->circulate()) && $U->is_true($location->circulate()));
+}
+
+=head2 copy_can_fulfill
+
+    $can_fulfill = $ils->copy_can_fulfill($copy);
+
+Check if the copy's location and the copy itself allow
+holds. Return true if they do, and false if they do not.
+
+=cut
+
+sub copy_can_fulfill {
+    my $self = shift;
+    my $copy = shift;
+
+    my $location = $copy->location();
+    unless (ref($location)) {
+        $location = $self->retrieve_copy_location($location);
+    }
+
+    return ($U->is_true($copy->holdable()) && $U->is_true($location->holdable()));
 }
 
 =head1 OVERRIDDEN PARENT METHODS
