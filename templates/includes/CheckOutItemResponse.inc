@@ -1,6 +1,4 @@
-<DateDue>[% datedue %]</DateDue>
-<UniqueItemId>
-<ItemIdentifierValue>[% barcode | xml %]</ItemIdentifierValue>
-</UniqueItemId>
-<UserOptionalFields>
-</UserOptionalFields>
+[% INCLUDE "includes/CheckInItemResponse.inc" %]
+[% IF data.DateDue -%]
+<DateDue>[% data.DateDue | xml %]</DateDue>
+[% END -%]
