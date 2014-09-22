@@ -971,6 +971,153 @@ sub checkoutitem {
     return $response;
 }
 
+=head2 requestitem
+
+    $response = $ils->requestitem($request);
+
+Handle the NCIP RequestItem message.
+
+=cut
+
+sub requestitem {
+    my $self = shift;
+    my $request = shift;
+    # Check our session and login if necessary:
+    $self->login() unless ($self->checkauth());
+
+    # Common stuff:
+    my $message = $self->parse_request_type($request);
+    my $response = NCIP::Response->new({type => $message . 'Response'});
+    $response->header($self->make_header($request));
+
+    # Because we need to have a user to place a hold, because the user
+    # is likely to have problems, and because getting the item
+    # information for the hold is trickier than getting the user
+    # information, we'll do the user first and short circuit out of
+    # the function if there is a problem with the user.
+    my ($user_barcode, $user_idfield) = $self->find_user_barcode($request);
+    if (ref($user_barcode) eq 'NCIP::Problem') {
+        $response->problem($user_barcode);
+        return $response;
+    }
+    my $user = $self->retrieve_user_by_barcode($user_barcode, $user_idfield);
+    if (ref($user) eq 'NCIP::Problem') {
+        $response->problem($user);
+        return $response;
+    }
+    my $problem = $self->check_user_for_problems($user, 'HOLD');
+    if ($problem) {
+        $response->problem($problem);
+        return $response;
+    }
+
+    # RequestItem is a blast. We need to check if we have a copy
+    # barcode and if we have BibliographicId. If we have both or
+    # either, we then need to figure out what we're placing the hold
+    # on, a copy, a volume or a bib. We don't currently do part holds,
+    # but maybe we should some day.
+
+    # We want $copy_details visible in the whole function, though we
+    # only retrieve it if we have a barcode.
+    my $copy_details;
+    # We need the copy barcode from the message.
+    my ($item_barcode, $item_idfield) = $self->find_item_barcode($request);
+    if (ref($item_barcode) ne 'NCIP::Problem') {
+        # Retrieve the copy details.
+        $copy_details = $self->retrieve_copy_details_by_barcode($item_barcode);
+        unless ($copy_details) {
+            # Return an Unkown Item problem unless we find the copy.
+            $response->problem(
+                NCIP::Problem->new(
+                    {
+                        ProblemType => 'Unknown Item',
+                        ProblemDetail => "Item with barcode $item_barcode is not known.",
+                        ProblemElement => $item_idfield,
+                        ProblemValue => $item_barcode
+                    }
+                )
+            );
+            return $response;
+        }
+    }
+
+    # We need to look for BibliographicId.
+    my $bre;
+    my $biblio_id = $self->find_bibliographic_id($request, 'SYSNUMBER');
+    if ($biblio_id) {
+        my $bibid;
+        if (ref($biblio_id) eq 'NCIP::Item::BibliographicRecordId') {
+            $bibid = $biblio_id->BibliographicRecordIdentifier();
+        } else {
+            $bibid = $bilio_id->BibliographicItemIdentifier();
+        }
+        $bre = $self->retrieve_biblio_record_entry($bibid) if ($bibid);
+        undef($bre) if ($bre && $U->is_true($bre->deleted()));
+    }
+
+    # Now, we can determine what "item" we're putting on hold: a
+    # volume, or a bib.
+    my $item;
+    if ($copy_details) {
+        $item = $copy_details->{volume};
+    } else {
+        $item = $bre;
+    }
+
+    # If we don't have an item, then blow up with a problem that may
+    # have been set when we went looking for the ItemId.
+    unless ($item) {
+        if (ref($item_barcode) eq 'NCIP::Problem') {
+            $response->problem($item_barcode);
+        } else {
+            $response->problem(
+                NCIP::Problem->new(
+                    {
+                        ProblemType => 'Request Item Not Found',
+                        ProblemDetail => 'Unable to determine the item to request from input message.',
+                        ProblemElement => 'NULL',
+                        ProblemValue => 'NULL'
+                    }
+                )
+            );
+        }
+        return $response;
+    }
+
+    # See if we were given a PickupLocation.
+    my $location;
+    if ($request->{$message}->{PickupLocation}) {
+        my $loc = $request->{$message}->{PickupLocation};
+        $loc =~ s/^.*://; # strip everything up to the last
+                          # semi-colon, if any.
+        $location = $self->retrieve_org_unit_by_shortname($loc);
+    }
+
+    # Place the hold.
+    my $hold = $self->place_hold($item, $user, $location);
+    if (ref($hold) eq 'NCIP::Problem') {
+        $response->problem($hold);
+    } else {
+        my $data = {
+            RequestId => NCIP::RequestId->new(
+                RequestIdentifierType => 'SYSNUMBER',
+                RequestIdentifierValue => $hold->id()
+            ),
+            UserId => NCIP::User::Id->new(
+                {
+                    UserIdentifierType => 'Barcode Id',
+                    UserIdentifierValue => $user->card->barcode()
+                }
+            ),
+            RequestType => $request->{$message}->{RequestType},
+            RequestScopeType => ($hold->hold_type() eq 'V') ? "item" : "bibliographic item"
+        };
+        $response->data($data);
+    }
+
+    return $response;
+}
+
 =head1 METHODS USEFUL to SUBCLASSES
 
 =head2 login
@@ -1321,6 +1468,28 @@ sub retrieve_copy_location {
     );
 
     return $location;
+}
+
+=head2 retrieve_biblio_record_entry
+
+    $bre = $ils->retrieve_biblio_record_entry($bre_id);
+
+Given a biblio.record_entry.id, this method retrieves a bre object.
+
+=cut
+
+sub retrieve_biblio_record_entry {
+    my $self = shift;
+    my $id = shift;
+
+    my $bre = $U->simplereq(
+        'open-ils.pcrud',
+        'open-ils.pcrud.retrieve.bre',
+        $self->{session}->{authtoken},
+        $id
+    );
+
+    return $bre;
 }
 
 =head2 create_precat_copy
