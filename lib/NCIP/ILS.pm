@@ -439,7 +439,7 @@ sub find_bibliographic_id {
                         last;
                     } elsif ($entry->{BibliographicItemId}->{BibliographicItemIdentifierCode}
                                  && $entry->{BibliographicItemId}->{BibliographicItemIdentifierCode} eq $idcode) {
-                        $idxml = $enty;
+                        $idxml = $entry;
                         last;
                     }
                 }
