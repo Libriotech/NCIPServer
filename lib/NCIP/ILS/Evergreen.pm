@@ -1049,7 +1049,7 @@ sub requestitem {
         if (ref($biblio_id) eq 'NCIP::Item::BibliographicRecordId') {
             $bibid = $biblio_id->BibliographicRecordIdentifier();
         } else {
-            $bibid = $bilio_id->BibliographicItemIdentifier();
+            $bibid = $biblio_id->BibliographicItemIdentifier();
         }
         $bre = $self->retrieve_biblio_record_entry($bibid) if ($bibid);
         undef($bre) if ($bre && $U->is_true($bre->deleted()));
