@@ -873,7 +873,7 @@ sub checkoutitem {
 
     # Check if the copy can circulate.
     unless ($self->copy_can_circulate($copy)) {
-        $reponse->problem(
+        $response->problem(
             NCIP::Problem->new(
                 {
                     ProblemType => 'Item Does Not Circulate',
