@@ -415,7 +415,9 @@ sub find_bibliographic_id {
 
     # Find the BibliographicId in the xml.
     my $idxml;
-    if ($request->{$message}->{BibliographicDescription}) {
+    if ($request->{$message}->{ItemOptionalFields}->{BibligraphicDescription}) {
+        $idxml = $request->{$message}->{ItemOptionalFields}->{BibligraphicDescription}->{BibliographicId};
+    } elsif ($request->{$message}->{BibliographicDescription}) {
         $idxml = $request->{$message}->{BibliographicDescription}->{BibliograhicId};
     } else {
         $idxml = $request->{$message}->{BibliographicId};
