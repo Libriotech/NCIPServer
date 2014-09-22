@@ -396,17 +396,22 @@ sub find_item_barcode {
 =head2 find_bibliographic_id
 
     $biblio_id = $ils->find_bibliographic_id($request);
+    $biblio_id = $ild->find_bibliographic_id($request, $code);
 
 Finds a BibliograpicId in the request message and returns either
 NCIP::Item::BibliographicItemId or NCIP::Item::BibliographicRecordId
 depending upon which is found in the request. If no BibliographicId is
 found, then it returns undef.
 
+If the optional $code argument is supplied, then it will look for an
+entry having that value in the identifier's code field.
+
 =cut
 
 sub find_bibliographic_id {
     my $self = shift;
     my $request = shift;
+    my $idcode = shift;
 
     # Our return variable, so set this if we find an id.
     my $id;
@@ -425,7 +430,23 @@ sub find_bibliographic_id {
     if ($idxml) {
         # BibliographicId is repeatable in some messages, but we only
         # use the first one.
-        $idxml = $idxml->[0] if (ref($idxml) eq 'ARRAY');
+        if (ref($idxml) eq 'ARRAY') {
+            if ($idcode) {
+                foreach my $entry (@$idxml) {
+                    if ($entry->{BibliographicRecordId}->{BibliographicRecordIdentifierCode}
+                            && $entry->{BibliographicRecordId}->{BibliographicRecordIdentifierCode} eq $idcode) {
+                        $idxml = $entry;
+                        last;
+                    } elsif ($entry->{BibliographicItemId}->{BibliographicItemIdentifierCode}
+                                 && $entry->{BibliographicItemId}->{BibliographicItemIdentifierCode} eq $idcode) {
+                        $idxml = $enty;
+                        last;
+                    }
+                }
+            } else {
+                $idxml = $idxml->[0];
+            }
+        }
         if ($idxml->{BibliographicRecordId}) {
             my ($identifier, $agencyid, $code);
             $identifier = $idxml->{BibliographicRecordId}->{BibliographicRecordIdentifier};
