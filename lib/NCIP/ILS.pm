@@ -302,6 +302,7 @@ sub parse_request_type {
 =head2 find_user_barcode
 
     $barcode = $ils->find_user_barcode($request);
+    ($barcode, $field) = $ils->find_user_barcode($request);
 
 If you have a request type that includes a user barcode identifier
 value, this routine will find it.
@@ -350,6 +351,7 @@ sub find_user_barcode {
 =head2 find_item_barcode
 
     $barcode = $ils->find_item_barcode($request);
+    ($barcode, $field) = $ils->find_item_barcode($request);
 
 If you have a request type that includes an item barcode identifier
 value, this routine will find it.
