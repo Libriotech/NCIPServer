@@ -423,6 +423,9 @@ sub find_bibliographic_id {
         $idxml = $request->{$message}->{BibliographicId};
     }
     if ($idxml) {
+        # BibliographicId is repeatable in some messages, but we only
+        # use the first one.
+        $idxml = $idxml->[0] if (ref($idxml) eq 'ARRAY');
         if ($idxml->{BibliographicRecordId}) {
             my ($identifier, $agencyid, $code);
             $identifier = $idxml->{BibliographicRecordId}->{BibliographicRecordIdentifier};
