@@ -23,6 +23,9 @@ use NCIP::Const;
 use NCIP::Header;
 use NCIP::Problem;
 use NCIP::Response;
+# For find_bibliographic_id:
+use NCIP::Item::BibliographicItemId;
+use NCIP::Item::BibliographicRecordId;
 
 =head1 NAME
 
@@ -388,6 +391,62 @@ sub find_item_barcode {
     }
 
     return (wantarray) ? ($barcode, $field) : $barcode;
+}
+
+=head2 find_bibliographic_id
+
+    $biblio_id = $ils->find_bibliographic_id($request);
+
+Finds a BibliograpicId in the request message and returns either
+NCIP::Item::BibliographicItemId or NCIP::Item::BibliographicRecordId
+depending upon which is found in the request. If no BibliographicId is
+found, then it returns undef.
+
+=cut
+
+sub find_bibliographic_id {
+    my $self = shift;
+    my $request = shift;
+
+    # Our return variable, so set this if we find an id.
+    my $id;
+
+    my $message = $self->parse_request_type($request);
+
+    # Find the BibliographicId in the xml.
+    my $idxml;
+    if ($request->{$message}->{BibliographicDescription}) {
+        $idxml = $request->{$message}->{BibliographicDescription}->{BibliograhicId};
+    } else {
+        $idxml = $request->{$message}->{BibliographicId};
+    }
+    if ($idxml) {
+        if ($idxml->{BibliographicRecordId}) {
+            my ($identifier, $agencyid, $code);
+            $identifier = $idxml->{BibliographicRecordId}->{BibliographicRecordIdentifier};
+            $code = $idxml->{BibliographicRecordId}->{BibliographicRecordIdentifierCode};
+            $agencyid = $idxml->{BibliographicRecordId}->{AgencyId};
+            $id = NCIP::Item::BibliographicRecordId->new(
+                {
+                    BibliographicRecordIdentifier => $identifier,
+                    BibliographicRecordIdentifierCode => $code,
+                    AgencyId => $agencyid
+                }
+            );
+        } else {
+            my ($identifier, $code);
+            $identifier = $idxml->{BibliographicItemId}->{BibliographicItemIdentifier};
+            $code = $idxml->{BibliographicItemId}->{BibliographicItemIdentifierCode};
+            $id = NCIP::Item::BibliographicItemId->new(
+                {
+                    BibliographicItemIdentifier => $identifier,
+                    BibliographicItemIdentifierCode => $code
+                }
+            );
+        }
+    }
+
+    return $id;
 }
 
 1;
