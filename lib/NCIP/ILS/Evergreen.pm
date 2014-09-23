@@ -1830,6 +1830,31 @@ sub place_hold {
         $params->{titleid} = $item->id();
     }
 
+    # Check for a duplicate hold:
+    my $duplicate = $U->simplereq(
+        'open-ils.pcrud',
+        'open-ils.pcrud.search.ahr',
+        $self->{session}->{authtoken},
+        {
+            hold_type => $hold->hold_type(),
+            target => $hold->target(),
+            usr => $hold->usr(),
+            expire_time => {'>' => 'now'},
+            cancel_time => undef,
+            fulfillment_time => undef
+        }
+    );
+    if ($duplicate) {
+        return NCIP::Problem->new(
+            {
+                ProblemType => 'Duplicate Request',
+                ProblemDetail => 'A request for this item already exists for this patron.',
+                ProblemElement => 'NULL',
+                ProblemValue => 'NULL'
+            }
+        );
+    }
+
     # Check if the hold is possible:
     my $r = $U->simplereq(
         'open-ils.circ',
