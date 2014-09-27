@@ -1075,6 +1075,9 @@ sub requestitem {
             );
         }
         return $response;
+    } elsif (ref($item) eq 'NCIP::Problem') {
+        $response->problem($item);
+        return $response;
     }
 
     # See if we were given a PickupLocation.
