@@ -23,7 +23,7 @@ use NCIP::Const;
 use NCIP::Header;
 use NCIP::Problem;
 use NCIP::Response;
-# For find_bibliographic_id:
+# For find_bibliographic_ids:
 use NCIP::Item::BibliographicItemId;
 use NCIP::Item::BibliographicRecordId;
 
@@ -393,28 +393,29 @@ sub find_item_barcode {
     return (wantarray) ? ($barcode, $field) : $barcode;
 }
 
-=head2 find_bibliographic_id
+=head2 find_bibliographic_ids
 
-    $biblio_id = $ils->find_bibliographic_id($request);
-    $biblio_id = $ild->find_bibliographic_id($request, $code);
+    $biblio_ids = $ils->find_bibliographic_ids($request);
+    @biblio_ids = $ils->find_bibliographic_ids($request);
 
-Finds a BibliograpicId in the request message and returns either
-NCIP::Item::BibliographicItemId or NCIP::Item::BibliographicRecordId
-depending upon which is found in the request. If no BibliographicId is
-found, then it returns undef.
+Finds the BibliograpicId tags in the request message and returns a
+list of NCIP::Item::BibliographicItemId or
+NCIP::Item::BibliographicRecordId depending upon which are found in
+the request, either or both could be present. If no BibliographicId is
+found, then it returns an empty list.
 
-If the optional $code argument is supplied, then it will look for an
-entry having that value in the identifier's code field.
+In array context, it returns an array, in scalar context, an array
+ref.
 
 =cut
 
-sub find_bibliographic_id {
+sub find_bibliographic_ids {
     my $self = shift;
     my $request = shift;
     my $idcode = shift;
 
-    # Our return variable, so set this if we find an id.
-    my $id;
+    # Our return variable, so set this if we find any ids.
+    my @ids = ();
 
     my $message = $self->parse_request_type($request);
 
@@ -428,51 +429,37 @@ sub find_bibliographic_id {
         $idxml = $request->{$message}->{BibliographicId};
     }
     if ($idxml) {
-        # BibliographicId is repeatable in some messages, but we only
-        # use the first one.
-        if (ref($idxml) eq 'ARRAY') {
-            if ($idcode) {
-                foreach my $entry (@$idxml) {
-                    if ($entry->{BibliographicRecordId}->{BibliographicRecordIdentifierCode}
-                            && $entry->{BibliographicRecordId}->{BibliographicRecordIdentifierCode} eq $idcode) {
-                        $idxml = $entry;
-                        last;
-                    } elsif ($entry->{BibliographicItemId}->{BibliographicItemIdentifierCode}
-                                 && $entry->{BibliographicItemId}->{BibliographicItemIdentifierCode} eq $idcode) {
-                        $idxml = $entry;
-                        last;
+        $idxml = [$idxml] unless (ref($idxml) eq 'ARRAY');
+        foreach my $entry (@$idxml) {
+            my $id;
+            if ($entry->{BibliographicRecordId}) {
+                my ($identifier, $agencyid, $code);
+                $identifier = $entry->{BibliographicRecordId}->{BibliographicRecordIdentifier};
+                $code = $entry->{BibliographicRecordId}->{BibliographicRecordIdentifierCode};
+                $agencyid = $entry->{BibliographicRecordId}->{AgencyId};
+                $id = NCIP::Item::BibliographicRecordId->new(
+                    {
+                        BibliographicRecordIdentifier => $identifier,
+                        BibliographicRecordIdentifierCode => $code,
+                        AgencyId => $agencyid
                     }
-                }
+                );
             } else {
-                $idxml = $idxml->[0];
+                my ($identifier, $code);
+                $identifier = $entry->{BibliographicItemId}->{BibliographicItemIdentifier};
+                $code = $entry->{BibliographicItemId}->{BibliographicItemIdentifierCode};
+                $id = NCIP::Item::BibliographicItemId->new(
+                    {
+                        BibliographicItemIdentifier => $identifier,
+                        BibliographicItemIdentifierCode => $code
+                    }
+                );
             }
-        }
-        if ($idxml->{BibliographicRecordId}) {
-            my ($identifier, $agencyid, $code);
-            $identifier = $idxml->{BibliographicRecordId}->{BibliographicRecordIdentifier};
-            $code = $idxml->{BibliographicRecordId}->{BibliographicRecordIdentifierCode};
-            $agencyid = $idxml->{BibliographicRecordId}->{AgencyId};
-            $id = NCIP::Item::BibliographicRecordId->new(
-                {
-                    BibliographicRecordIdentifier => $identifier,
-                    BibliographicRecordIdentifierCode => $code,
-                    AgencyId => $agencyid
-                }
-            );
-        } else {
-            my ($identifier, $code);
-            $identifier = $idxml->{BibliographicItemId}->{BibliographicItemIdentifier};
-            $code = $idxml->{BibliographicItemId}->{BibliographicItemIdentifierCode};
-            $id = NCIP::Item::BibliographicItemId->new(
-                {
-                    BibliographicItemIdentifier => $identifier,
-                    BibliographicItemIdentifierCode => $code
-                }
-            );
+            push(@ids, $id);
         }
     }
 
-    return $id;
+    return (wantarray) @ids : [@ids];
 }
 
 1;
