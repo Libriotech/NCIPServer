@@ -459,7 +459,7 @@ sub find_bibliographic_ids {
         }
     }
 
-    return (wantarray) @ids : [@ids];
+    return (wantarray) ? @ids : [@ids];
 }
 
 1;
