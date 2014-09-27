@@ -2235,7 +2235,7 @@ sub _init {
     }
 }
 
-# Search asst.call_number by a bre.id and location object. Return the
+# Search asset.call_number by a bre.id and location object. Return the
 # "closest" call_number if found, undef otherwise.
 sub _call_number_search {
     my $self = shift;
