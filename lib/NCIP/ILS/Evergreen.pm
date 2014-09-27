@@ -1012,19 +1012,25 @@ sub requestitem {
     }
 
     # RequestItem is a blast. We need to check if we have a copy
-    # barcode and if we have BibliographicId. If we have both or
+    # barcode and/or if we have BibliographicIds. If we have both or
     # either, we then need to figure out what we're placing the hold
     # on, a copy, a volume or a bib. We don't currently do part holds,
-    # but maybe we should some day.
+    # but maybe we should some day. We can also be sent more than 1
+    # BibliographicId, so we look for certain identifiers first, and
+    # then others in decreasing preference: SYSNUMBER, ISBN, and ISSN.
 
-    # We want $copy_details visible in the whole function, though we
-    # only retrieve it if we have a barcode.
-    my $copy_details;
+    # Not to mention that there are two kinds of BibliographicId field
+    # with different field names, and both can be intermixed in an
+    # incoming message! (I just /love/ this nonsense.)
+
+    # This here is the thing we're going to put on hold:
+    my $item;
+
     # We need the copy barcode from the message.
     my ($item_barcode, $item_idfield) = $self->find_item_barcode($request);
     if (ref($item_barcode) ne 'NCIP::Problem') {
         # Retrieve the copy details.
-        $copy_details = $self->retrieve_copy_details_by_barcode($item_barcode);
+        my $copy_details = $self->retrieve_copy_details_by_barcode($item_barcode);
         unless ($copy_details) {
             # Return an Unkown Item problem unless we find the copy.
             $response->problem(
@@ -1039,29 +1045,16 @@ sub requestitem {
             );
             return $response;
         }
+        $item = $copy_details->{volume}; # We place a volume hold.
     }
 
-    # We need to look for BibliographicId.
-    my $bre;
-    my $biblio_id = $self->find_bibliographic_id($request, 'SYSNUMBER');
-    if ($biblio_id) {
-        my $bibid;
-        if (ref($biblio_id) eq 'NCIP::Item::BibliographicRecordId') {
-            $bibid = $biblio_id->BibliographicRecordIdentifier();
-        } else {
-            $bibid = $biblio_id->BibliographicItemIdentifier();
+    # We weren't given copy information to target, or we can't find
+    # it, so we need to look for a target via BibliographicId.
+    unless ($item) {
+        my @biblio_ids = $self->find_bibliographic_ids($request);
+        if (@biblio_ids) {
+            $item = $self->find_target_via_bibliographic_id(@biblio_ids);
         }
-        $bre = $self->retrieve_biblio_record_entry($bibid) if ($bibid);
-        undef($bre) if ($bre && $U->is_true($bre->deleted()));
-    }
-
-    # Now, we can determine what "item" we're putting on hold: a
-    # volume, or a bib.
-    my $item;
-    if ($copy_details) {
-        $item = $copy_details->{volume};
-    } else {
-        $item = $bre;
     }
 
     # If we don't have an item, then blow up with a problem that may
@@ -1451,7 +1444,7 @@ sub retrieve_org_unit_by_shortname {
 
     $location = $ils->retrieve_copy_location($location_id);
 
-Retrive a copy location based on id.
+Retrieve a copy location based on id.
 
 =cut
 
@@ -2029,6 +2022,107 @@ sub find_item_barcode {
     return (wantarray) ? ($value, $idfield) : $value;
 }
 
+=head2 find_target_via_bibliographic_id
+
+    $item = $ils->find_target_via_bibliographic_id(@biblio_ids);
+
+Searches for a bibliographic record to put on hold and returns an
+appropriate hold target item depending upon what it finds. If an
+appropriate, single target cannot be found, it returns an
+NCIP::Problem with the problem message.
+
+Currently, we only look for SYSNUMBER, ISBN, and ISSN record
+identifiers. If nothing is found, this method can return undef. (Gotta
+love Perl and untyped/weakly typed languages in general!)
+
+TODO: Figure out how to search OCLC numbers. We probably need to use
+"MARC Expert Search" if we don't want to do a JSON query on
+metabib.full_rec.
+
+=cut
+
+sub find_target_via_bibliographid_id {
+    my $self = shift;
+    my @biblio_ids = @_;
+
+    # The item that we find:
+    my $item;
+
+    # Id for our bib in Evergreen:
+    my $bibid;
+
+    # First, let's look for a SYSNUMBER:
+    my ($idobj) = grep
+        { $_->{BibligraphicRecordIdentifierCode} eq 'SYSNUMBER' || $_->{BibliographicItemIdentifierCode} eq 'SYSNUMBER'
+              || $_->{AgencyId} }
+            @biblio_ids;
+    if ($idobj) {
+        my $loc;
+        # BibliographicRecordId can have an AgencyId field if the
+        # BibliographicRecordIdentifierCode is absent.
+        if ($idobj->{AgencyId}) {
+            $bibid = $idobj->{BibliographicRecordIdentifier};
+            my $locname = $idobj->{AgencyId};
+            if ($locname) {
+                $locname =~ s/.*://;
+                $loc = $self->retrieve_org_unit_by_shortname($locname);
+            }
+        } elsif ($idobj->{BibliographicRecordIdentifierCode}) {
+            $bibid = $idobj->{BibliographicRecordIdentifierCode}
+        } else {
+            $bibid = $idobj->{BibliographicItemIdentifierCode}
+        }
+        if ($bibid && $loc) {
+            $item = $self->_call_number_search($bibid, $loc);
+        } else {
+            $item = $U->simplereq(
+                'open-ils.pcrud',
+                'open-ils.pcrud.retrieve.bre',
+                $self->{session}->{authtoken},
+                $bibid
+            );
+        }
+        # Check if item is deleted so we'll look for more
+        # possibilties.
+        undef($item) if ($item && $U->is_true($item->deleted()));
+    }
+
+    # Build an array of id objects based on the other identifier fields.
+    my @idobjs = grep
+        {
+            $_->{BibliographicRecordIdentifierCode} eq 'ISBN' || $_->{BibliographicItemIdentifierCode} eq 'ISBN'
+            ||
+            $_->{BibliographicRecordIdentifierCode} eq 'ISSN' || $_->{BibliographicItemIdentifierCode} eq 'ISSN'
+        } @biblio_ids;
+
+    if (@idobjs) {
+        my $stashed_problem;
+        # Reuse $idobj from above.
+        foreach $idobj (@$idobjs) {
+            my ($idvalue, $idtype, $idfield);
+            if ($_->{BibliographicItemIdentifier}) {
+                $idvalue = $_->{BibliographicItemIdentifier};
+                $idtype = $_->{BibliographicItemIdentifierCode};
+                $idfield = 'BibliographicItemIdentifier';
+            } else {
+                $idvalue = $_->{BibliographicRecordIdentifier};
+                $idtype = $_->{BibliographicRecordIdentifierCode};
+                $idfield = 'BibliographicRecordIdentifier';
+            }
+            $item = $self->_bib_search($idvalue, $idtype);
+            if (ref($item) eq 'NCIP::Problem') {
+                $stashed_problem = $item unless($stashed_problem);
+                $stashed_problem->ProblemElement($idfield);
+                undef($item);
+            }
+            last if ($item);
+        }
+        $item = $stashed_problem if (!$tem && $stashed_problem);
+    }
+
+    return $item;
+}
+
 # private subroutines not meant to be used directly by subclasses.
 # Most have to do with setup and/or state checking of implementation
 # components.
@@ -2139,6 +2233,63 @@ sub _init {
         my ($stat) = grep {$_->id() == $entry->{stat_cat}} @$stat_cats;
         push(@{$self->{stat_cat_entries}}, grep {$_->owner() =~ $re && $_->value() eq $entry->{content}} @{$stat->entries()});
     }
+}
+
+# Search asst.call_number by a bre.id and location object. Return the
+# "closest" call_number if found, undef otherwise.
+sub _call_number_search {
+    my $self = shift;
+    my $bibid = shift;
+    my $location = shift;
+
+    # At some point, this should be smarter, and we should retrieve
+    # ancestors and descendants and search with a JSON query or some
+    # such with results ordered by proximity to the original location,
+    # but I don't have time to implement that right now.
+    my $acn = $U->simplereq(
+        'open-ils.prcud',
+        'open-ils.pcrud.search.acn',
+        $self->{session}->{authtoken},
+        {record => $bibid, owning_lib => $location->id()}
+    );
+
+    return $acn;
+}
+
+# Do a multiclass.query to search for items by isbn or issn.
+sub _bib_search {
+    my $self = shift;
+    my $idvalue = shift;
+    my $idtype = shift;
+    my $item;
+
+    my $result = $U->simplereq(
+        'open-ils.search',
+        'open-ils.search.biblio.multiclass',
+        {searches => {lc($idtype) => $idvalue}}
+    );
+
+    if ($result && $result->{count}) {
+        if ($result->{count} > 1) {
+            $item = NCIP::Problem->new(
+                {
+                    ProblemType => 'Non-Unique Item',
+                    ProblemDetail => 'More than one item matches the request.',
+                    ProblemElement => '',
+                    ProblemValue => $idvalue
+                }
+            );
+        }
+        my $bibid = $result->{ids}->[0]->[0];
+        $item = $U->simplereq(
+            'open-ils.pcrud',
+            'open-ils.pcrud.retrieve.bre',
+            $self->{session}->{authtoken},
+            $bibid
+        );
+    }
+
+    return $item;
 }
 
 # Standalone, "helper" functions.  These do not take an object or
