@@ -1439,10 +1439,9 @@ sub retrieve_org_unit_by_shortname {
     my $shortname = shift;
 
     my $aou = $U->simplereq(
-        'open-ils.pcrud',
-        'open-ils.pcrud.search.aou',
-        $self->{session}->{authtoken},
-        {shortname => {'=' => {transform => 'lower', value => ['lower', $shortname]}}}
+        'open-ils.actor',
+        'open-ils.actor.org_unit.retrieve_by_shortname',
+        $shortname
     );
 
     return $aou;
