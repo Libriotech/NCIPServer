@@ -1290,9 +1290,7 @@ sub cancelrequestitem {
             # the user.  We'll need to search for copy (or force) holds, a
             # volume hold, or a title hold.
             $hold = $self->_hold_search($user, $copy_details);
-            if (ref($hold) eq 'NCIP::Problem') {
-                $response->problem($hold);
-            } elsif ($hold->transit()) {
+            if ($hold && $hold->transit()) {
                 $response->problem(
                     NCIP::Problem->new(
                         {
@@ -1303,7 +1301,7 @@ sub cancelrequestitem {
                         }
                     )
                 )
-            } else {
+            } elsif ($hold) {
                 $self->cancel_hold($hold);
                 $response->data(
                     {
@@ -1320,6 +1318,17 @@ sub cancelrequestitem {
                             }
                         )
                     }
+                )
+            } else {
+                $response->problem(
+                    NCIP::Problem->new(
+                        {
+                            ProblemType => 'Unknown Request',
+                            ProblemDetail => 'No request found for the item and user',
+                            ProblemElement => 'NULL',
+                            ProblemValue => 'NULL'
+                        }
+                    )
                 )
             }
         }
@@ -2547,8 +2556,7 @@ sub _hold_search {
 
     my $hold;
 
-    # Retrieve all of the user's uncanceled, unfulfilled holds, and
-    # then search them in Perl.
+    # Retrieve all of the user's active holds, and then search them in Perl.
     my $holds_list = $U->simplereq(
         'open-ils.circ',
         'open-ils.circ.holds.retrieve',
@@ -2576,17 +2584,6 @@ sub _hold_search {
         if (@holds) {
             $hold = $holds[0];
         }
-    }
-
-    unless ($hold) {
-        $hold = NCIP::Problem->new(
-            {
-                ProblemType => 'Unknown Request',
-                ProblemDetail => 'Request matching the user and item not found.',
-                ProblemElement => 'NULL',
-                ProblemValue => 'NULL'
-            }
-        )
     }
 
     return $hold;
