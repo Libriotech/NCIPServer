@@ -520,7 +520,7 @@ sub checkinitem {
     # Retrieve the copy details.
     my $details = $self->retrieve_copy_details_by_barcode($item_barcode);
     unless ($details) {
-        # Return an Unkown Item problem unless we find the copy.
+        # Return an Unknown Item problem unless we find the copy.
         $response->problem(
             NCIP::Problem->new(
                 {
@@ -655,7 +655,7 @@ sub renewitem {
     # Retrieve the copy details.
     my $details = $self->retrieve_copy_details_by_barcode($item_barcode);
     unless ($details) {
-        # Return an Unkown Item problem unless we find the copy.
+        # Return an Unknown Item problem unless we find the copy.
         $response->problem(
             NCIP::Problem->new(
                 {
@@ -842,7 +842,7 @@ sub checkoutitem {
     # Retrieve the copy details.
     my $details = $self->retrieve_copy_details_by_barcode($item_barcode);
     unless ($details) {
-        # Return an Unkown Item problem unless we find the copy.
+        # Return an Unknown Item problem unless we find the copy.
         $response->problem(
             NCIP::Problem->new(
                 {
@@ -1032,7 +1032,7 @@ sub requestitem {
         # Retrieve the copy details.
         my $copy_details = $self->retrieve_copy_details_by_barcode($item_barcode);
         unless ($copy_details) {
-            # Return an Unkown Item problem unless we find the copy.
+            # Return an Unknown Item problem unless we find the copy.
             $response->problem(
                 NCIP::Problem->new(
                     {
@@ -1109,6 +1109,220 @@ sub requestitem {
             RequestScopeType => ($hold->hold_type() eq 'V') ? "item" : "bibliographic item"
         };
         $response->data($data);
+    }
+
+    return $response;
+}
+
+=head2 cancelrequestitem
+
+    $response = $ils->cancelrequestitem($request);
+
+Handle the NCIP CancelRequestItem message.
+
+=cut
+
+sub cancelrequestitem {
+    my $self = shift;
+    my $request = shift;
+    # Check our session and login if necessary:
+    $self->login() unless ($self->checkauth());
+
+    # Common stuff:
+    my $message = $self->parse_request_type($request);
+    my $response = NCIP::Response->new({type => $message . 'Response'});
+    $response->header($self->make_header($request));
+
+    # UserId is required by the standard, but we might not really need it.
+    my ($user_barcode, $user_idfield) = $self->find_user_barcode($request);
+    if (ref($user_barcode) eq 'NCIP::Problem') {
+        $response->problem($user_barcode);
+        return $response;
+    }
+    my $user = $self->retrieve_user_by_barcode($user_barcode, $user_idfield);
+    if (ref($user) eq 'NCIP::Problem') {
+        $response->problem($user);
+        return $response;
+    }
+
+    # See if we got a ItemId and a barcode:
+    my $copy_details;
+    my ($item_barcode, $item_idfield) = $self->find_item_barcode($request);
+    if (ref($item_barcode) ne 'NCIP::Problem') {
+        # Retrieve the copy details.
+        $copy_details = $self->retrieve_copy_details_by_barcode($item_barcode);
+        unless ($copy_details) {
+            # Return an Unknown Item problem unless we find the copy.
+            $response->problem(
+                NCIP::Problem->new(
+                    {
+                        ProblemType => 'Unknown Item',
+                        ProblemDetail => "Item with barcode $item_barcode is not known.",
+                        ProblemElement => $item_idfield,
+                        ProblemValue => $item_barcode
+                    }
+                )
+            );
+            return $response;
+        }
+    }
+
+    # See if we got a RequestId:
+    my $requestid;
+    if ($request->{$message}->{RequestId}) {
+        $requestid = NCIP::RequestId->new(
+            {
+                AgencyId => $request->{$message}->{RequestId}->{AgencyId},
+                RequestIdentifierType => $request->{$message}->{RequestId}->{RequestIdentifierType},
+                RequestIdentifierValue => $request->{$message}->{RequestId}->{RequestIdentifierValue}
+            }
+        )
+    }
+
+    # Just a note: In the below, we cannot rely on the hold or transit
+    # fields of the copy_details, even if we have retrieved it. This
+    # is because that hold and transit may not be the ones that we're
+    # looking for, i.e. they could be for another patron, etc.
+
+    # See if we can find the hold:
+    my $hold;
+    if ($requestid) {
+        $hold = $U->simplereq(
+            'open-ils.pcrud',
+            'open-ils.pcrud.retrieve.ahr',
+            $self->{session}->{authtoken},
+            $requestid->{RequestIdentifierValue},
+            {flesh => 1, flesh_fields => {ahr => ['transit']}}
+        );
+        unless ($hold) {
+            # Report a problem that we couldn't find a hold by that id.
+            $response->problem(
+                NCIP::Problem->new(
+                    {
+                        ProblemType => 'Unknown Request',
+                        ProblemDetail => 'No request with this identifier found',
+                        ProblemElement => 'RequestIdentifierValue',
+                        ProblemValue => $requestid->{RequestIdentifierValue}
+                    }
+                )
+            )
+        } elsif ($hold->cancel_time()) {
+            $response->problem(
+                NCIP::Problem->new(
+                    {
+                        ProblemType => 'Request Already Canceled',
+                        ProblemDetail => 'Request has already been canceled',
+                        ProblemElement => 'RequestIdentifierValue',
+                        ProblemValue => $requestid->{RequestIdentifierValue}
+                    }
+                )
+            )
+        } elsif ($hold->transit()) {
+            $response->problem(
+                NCIP::Problem->new(
+                    {
+                        ProblemType => 'Request Already Processed',
+                        ProblemDetail => 'Request has already been processed',
+                        ProblemElement => 'RequestIdentifierValue',
+                        ProblemValue => $requestid->{RequestIdentifierValue}
+                    }
+                )
+            )
+        } elsif ($hold->usr() == $user->id()) {
+            # Check the target matches the copy information, if any,
+            # that we were given.
+            my $obj_id;
+            if ($copy_details) {
+                if ($hold->hold_type() eq 'V') {
+                    $obj_id = $copy_details->{volume}->id();
+                } elsif ($hold->hold_type() eq 'T') {
+                    $obj_id = $copy_details->{mvr}->doc_id();
+                } elsif ($hold->hold_type() eq 'C' || $hold->hold_type() eq 'F') {
+                    $obj_id = $copy_details->{copy}->id();
+                }
+            }
+            if ($obj_id && $hold->target() != $obj_id) {
+                $response->problem(
+                    NCIP::Problem->new(
+                        {
+                            ProblemType => 'Request Not For This Item',
+                            ProblemDetail => "Request is not for this item",
+                            ProblemElement => $item_idfield,
+                            ProblemElement => $item_barcode
+                        }
+                    )
+                )
+            } else {
+                $self->cancel_hold($hold);
+                $response->data(
+                    {
+                        RequestId => $requestid,
+                        UserId => NCIP::User::Id->new(
+                            {
+                                UserIdentifierType => 'Barcode Id',
+                                UserIdentifierValue => $user->card->barcode()
+                            }
+                        )
+                    }
+                )
+            }
+        } else {
+            # Report a problem that the hold is not for this user.
+            $response->problem(
+                NCIP::Problem->new(
+                    {
+                        ProblemType => 'Request Not For This User',
+                        ProblemDetail => 'Request is not for this user.',
+                        ProblemElement => $user_idfield,
+                        ProblemValue => $user_barcode
+                    }
+                )
+            )
+        }
+    } else {
+        # At this point, we *must have* an ItemId and therefore
+        # $copy_details, so return the problem from looking up the
+        # barcode if we don't have $copy_details.
+        if (!$copy_details) {
+            $response->problem($item_barcode);
+        } else {
+            # We have to search for the hold based on the copy details and
+            # the user.  We'll need to search for copy (or force) holds, a
+            # volume hold, or a title hold.
+            $hold = $self->_hold_search($user, $copy_details);
+            if (ref($hold) eq 'NCIP::Problem') {
+                $response->problem($hold);
+            } elsif ($hold->transit()) {
+                $response->problem(
+                    NCIP::Problem->new(
+                        {
+                            ProblemType => 'Request Already Processed',
+                            ProblemDetail => 'Request has already been processed',
+                            ProblemElement => 'RequestIdentifierValue',
+                            ProblemValue => $requestid->{RequestIdentifierValue}
+                        }
+                    )
+                )
+            } else {
+                $self->cancel_hold($hold);
+                $response->data(
+                    {
+                        RequestId => NCIP::RequestId->new(
+                            {
+                                RequestIdentifierType => 'SYSNUMBER',
+                                RequestIdentifierValue => $hold->id()
+                            }
+                        ),
+                        UserId => NCIP::User::Id->new(
+                            {
+                                UserIdentifierType => 'Barcode Id',
+                                UserIdentifierValue => $user->card->barcode()
+                            }
+                        )
+                    }
+                )
+            }
+        }
     }
 
     return $response;
@@ -1879,6 +2093,36 @@ sub place_hold {
     return $hold;
 }
 
+=head2 cancel_hold
+
+    $ils->cancel_hold($hold);
+
+This method cancels the hold argument. It makes no checks on the hold,
+so if there are certain conditions that need to be fulfilled before
+the hold is canceled, then you must check them before calling this
+method.
+
+It returns undef on success or failure. If it fails, you've usually
+got bigger problems.
+
+=cut
+
+sub cancel_hold {
+    my $self = shift;
+    my $hold = shift;
+
+    my $r = $U->simplereq(
+        'open-ils.circ',
+        'open-ils.circ.hold.cancel',
+        $self->{session}->{authtoken},
+        $hold->id(),
+        '5',
+        'Canceled via NCIPServer'
+    );
+
+    return undef;
+}
+
 =head2 delete_copy
 
     $ils->delete_copy($copy);
@@ -2293,6 +2537,59 @@ sub _bib_search {
     }
 
     return $item;
+}
+
+# Search for holds using the user and copy_details information:
+sub _hold_search {
+    my $self = shift;
+    my $user = shift;
+    my $copy_details = shift;
+
+    my $hold;
+
+    # Retrieve all of the user's uncanceled, unfulfilled holds, and
+    # then search them in Perl.
+    my $holds_list = $U->simplereq(
+        'open-ils.circ',
+        'open-ils.circ.holds.retrieve',
+        $self->{session}->{authtoken},
+        $user->id(),
+        0
+    );
+
+    if ($holds_list && @$holds_list) {
+        my @holds;
+        # Look for title holds (the most common), first:
+        my $targetid = $copy_details->{mvr}->doc_id();
+        @holds = grep {$_->hold_type eq 'T' && $_->target == $targetid} @{$holds_list};
+        unless (@holds) {
+            # Look for volume holds, the next most common:
+            $targetid = $copy_details->{volume}->id();
+            @holds = grep {$_->hold_type eq 'V' && $_->target == $tagetid} @{$holds_list};
+        }
+        unless (@holds) {
+            # Look for copy and force holds, the least likely.
+            $targetid = $copy_details->{copy}->id();
+            @holds = grep {($_->hold_type eq 'C' || $_->hold_type eq 'F') && $_->target == $targetid} @{$holds_list};
+        }
+        # There should only be 1, at this point, if there are any.
+        if (@holds) {
+            $hold = $holds[0];
+        }
+    }
+
+    unless ($hold) {
+        $hold = NCIP::Problem->new(
+            {
+                ProblemType => 'Unknown Request',
+                ProblemDetail => 'Request matching the user and item not found.',
+                ProblemElement => 'NULL',
+                ProblemValue => 'NULL'
+            }
+        )
+    }
+
+    return $hold;
 }
 
 # Standalone, "helper" functions.  These do not take an object or
