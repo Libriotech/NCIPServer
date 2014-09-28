@@ -2345,7 +2345,7 @@ sub find_target_via_bibliographid_id {
     if (@idobjs) {
         my $stashed_problem;
         # Reuse $idobj from above.
-        foreach $idobj (@$idobjs) {
+        foreach $idobj (@idobjs) {
             my ($idvalue, $idtype, $idfield);
             if ($_->{BibliographicItemIdentifier}) {
                 $idvalue = $_->{BibliographicItemIdentifier};
@@ -2364,7 +2364,7 @@ sub find_target_via_bibliographid_id {
             }
             last if ($item);
         }
-        $item = $stashed_problem if (!$tem && $stashed_problem);
+        $item = $stashed_problem if (!$item && $stashed_problem);
     }
 
     return $item;
@@ -2565,7 +2565,7 @@ sub _hold_search {
         unless (@holds) {
             # Look for volume holds, the next most common:
             $targetid = $copy_details->{volume}->id();
-            @holds = grep {$_->hold_type eq 'V' && $_->target == $tagetid} @{$holds_list};
+            @holds = grep {$_->hold_type eq 'V' && $_->target == $targetid} @{$holds_list};
         }
         unless (@holds) {
             # Look for copy and force holds, the least likely.
