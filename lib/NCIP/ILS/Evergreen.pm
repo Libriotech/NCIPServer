@@ -926,7 +926,7 @@ sub checkoutitem {
         'open-ils.circ.checkout.full.override',
         $self->{session}->{authtoken},
         $params
-    )->gather(1);
+    );
 
     # We only look at the first one, since more than one usually means
     # failure.
