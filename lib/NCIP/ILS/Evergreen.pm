@@ -2621,20 +2621,18 @@ sub _problem_from_event {
     if (ref($evt)) {
         my ($textcode, $desc);
 
-        # Get the textcode, if available. We favor those defined in
-        # ils_events.xml over those made up on the fly.
-        if ($evt->{ilsevent} && $evt->{ilsevent}->{textcode}) {
-            $textcode = $evt->{ilsevent}->{textcode};
-        } elsif ($evt->{textcode}) {
+        # Get the textcode, if available. Otherwise, use the ilsevent
+        # "id," if available.
+        if ($evt->{textcode}) {
             $textcode = $evt->{textcode};
+        } elsif ($evt->{ilsevent}) {
+            $textcode = $evt->{ilsevent};
         }
 
         # Get the description. We favor translated descriptions over
         # the English in ils_events.xml.
         if ($evt->{desc}) {
             $desc = $evt->{desc};
-        } elsif ($evt->{ilsevent} && $evt->{ilsevent}->{desc}) {
-            $desc = $evt->{ilsevent}->{desc};
         }
 
         # Check if $type was set. As an "undocumented" feature, you
