@@ -1089,8 +1089,11 @@ sub requestitem {
         $location = $self->retrieve_org_unit_by_shortname($loc);
     }
 
+    # Look for a NeedBeforeDate to use as expiration...
+    my $hold_expiration = $request->{$message}->{NeedBeforeDate};
+
     # Place the hold.
-    my $hold = $self->place_hold($item, $user, $location);
+    my $hold = $self->place_hold($item, $user, $location, $hold_expiration);
     if (ref($hold) eq 'NCIP::Problem') {
         $response->problem($hold);
     } else {
@@ -1988,11 +1991,15 @@ sub create_fuller_copy {
 
 =head2 place_hold
 
-    $hold = $ils->place_hold($item, $user, $location);
+    $hold = $ils->place_hold($item, $user, $location, $expiration);
 
 This function places a hold on $item for $user for pickup at
 $location. If location is not provided or undefined, the user's home
 library is used as a fallback.
+
+The $expiration argument is optional and must be a properly formatted
+ISO date time. It will be used as the hold expire time, if
+provided. Otherwise the system default time will be used.
 
 $item can be a copy (asset::copy), volume (asset::call_number), or bib
 (biblio::record_entry). The appropriate hold type will be placed
@@ -2008,6 +2015,7 @@ sub place_hold {
     my $item = shift;
     my $user = shift;
     my $location = shift;
+    my $expiration = shift;
 
     # If $location is undefined, use the user's home_ou, which should
     # have been fleshed when the user was retrieved.
@@ -2022,6 +2030,7 @@ sub place_hold {
     $hold->target($item->id());
     $hold->usr($user->id());
     $hold->pickup_lib($location->id());
+    $hold->expire_time(cleanse_ISO8601($expiration)) if ($expiration);
     if (!$user->email()) {
         $hold->email_notify('f');
         $hold->phone_notify($user->day_phone()) if ($user->day_phone());
