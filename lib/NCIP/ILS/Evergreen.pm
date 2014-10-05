@@ -470,6 +470,14 @@ sub checkinitem {
             )
         };
 
+        # Look for UserElements requested and add it to the response:
+        my $elements = $request->{$message_type}->{UserElementType};
+        if ($elements) {
+            $elements = [$elements] unless (ref $elements eq 'ARRAY');
+            my $optionalfields = $self->handle_user_elements($circ_user, $elements);
+            $data->{UserOptionalFields} = $optionalfields;
+        }
+
         $response->data($data);
 
         # At some point in the future, we should probably check if
@@ -659,6 +667,14 @@ sub renewitem {
         $due->set_time_zone('UTC');
         $data->{DateDue} = $due->iso8601();
 
+        # Look for UserElements requested and add it to the response:
+        my $elements = $request->{$message_type}->{UserElementType};
+        if ($elements) {
+            $elements = [$elements] unless (ref $elements eq 'ARRAY');
+            my $optionalfields = $self->handle_user_elements($user, $elements);
+            $data->{UserOptionalFields} = $optionalfields;
+        }
+
         $response->data($data);
     }
 
@@ -818,6 +834,14 @@ sub checkoutitem {
         $due->set_time_zone('UTC');
         $data->{DateDue} = $due->iso8601();
 
+        # Look for UserElements requested and add it to the response:
+        my $elements = $request->{$message_type}->{UserElementType};
+        if ($elements) {
+            $elements = [$elements] unless (ref $elements eq 'ARRAY');
+            my $optionalfields = $self->handle_user_elements($user, $elements);
+            $data->{UserOptionalFields} = $optionalfields;
+        }
+
         $response->data($data);
     }
 
@@ -969,6 +993,14 @@ sub requestitem {
             RequestType => $request->{$message}->{RequestType},
             RequestScopeType => ($hold->hold_type() eq 'V') ? "item" : "bibliographic item"
         };
+        # Look for UserElements requested and add it to the response:
+        my $elements = $request->{$message_type}->{UserElementType};
+        if ($elements) {
+            $elements = [$elements] unless (ref $elements eq 'ARRAY');
+            my $optionalfields = $self->handle_user_elements($user, $elements);
+            $data->{UserOptionalFields} = $optionalfields;
+        }
+
         $response->data($data);
     }
 
@@ -1115,17 +1147,23 @@ sub cancelrequestitem {
                 )
             } else {
                 $self->cancel_hold($hold);
-                $response->data(
-                    {
-                        RequestId => $requestid,
-                        UserId => NCIP::User::Id->new(
-                            {
-                                UserIdentifierType => 'Barcode Id',
-                                UserIdentifierValue => $user->card->barcode()
-                            }
-                        )
-                    }
-                )
+                my $data = {
+                    RequestId => $requestid,
+                    UserId => NCIP::User::Id->new(
+                        {
+                            UserIdentifierType => 'Barcode Id',
+                            UserIdentifierValue => $user->card->barcode()
+                        }
+                    )
+                };
+                # Look for UserElements requested and add it to the response:
+                my $elements = $request->{$message_type}->{UserElementType};
+                if ($elements) {
+                    $elements = [$elements] unless (ref $elements eq 'ARRAY');
+                    my $optionalfields = $self->handle_user_elements($user, $elements);
+                    $data->{UserOptionalFields} = $optionalfields;
+                }
+                $response->data($data);
             }
         } else {
             # Report a problem that the hold is not for this user.

@@ -18,3 +18,4 @@
 <UserIdentifierValue>[% data.UserId.UserIdentifierValue | xml %]</UserIdentifierValue>
 </UserId>
 [% END -%]
+[% INCLUDE "includes/UserOptionalFields.inc" -%]

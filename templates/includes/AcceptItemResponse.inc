@@ -18,3 +18,4 @@
 <ItemIdentifierValue>[% data.ItemId.ItemIdentifierValue | xml %]</ItemIdentifierValue>
 </ItemId>
 [% END -%]
+[% INCLUDE "includes/UserOptionalFields.inc" -%]

@@ -18,3 +18,4 @@
 </UserId>
 <RequestType>[% data.RequestType | xml %]</RequestType>
 <RequestScopeType>[% data.RequestScopeType | xml %]</RequestScopeType>
+[% INCLUDE "includes/UserOptionalFields.inc" -%]
