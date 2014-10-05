@@ -2378,7 +2378,7 @@ sub find_target_via_bibliographic_id {
 
     # First, let's look for a SYSNUMBER:
     my ($idobj) = grep
-        { $_->{BibligraphicRecordIdentifierCode} eq 'SYSNUMBER' || $_->{BibliographicItemIdentifierCode} eq 'SYSNUMBER'
+        { $_->{BibliographicRecordIdentifierCode} eq 'SYSNUMBER' || $_->{BibliographicItemIdentifierCode} eq 'SYSNUMBER'
               || $_->{AgencyId} }
             @biblio_ids;
     if ($idobj) {
