@@ -2360,7 +2360,7 @@ metabib.full_rec.
 
 =cut
 
-sub find_target_via_bibliographid_id {
+sub find_target_via_bibliographic_id {
     my $self = shift;
     my @biblio_ids = @_;
 
