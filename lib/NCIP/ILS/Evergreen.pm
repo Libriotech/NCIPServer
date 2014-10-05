@@ -174,149 +174,7 @@ sub lookupuser {
     my $elements = $request->{$message_type}->{UserElementType};
     if ($elements) {
         $elements = [$elements] unless (ref $elements eq 'ARRAY');
-        my $optionalfields = NCIP::User::OptionalFields->new();
-
-        # First, we'll look for name information.
-        if (grep {$_ eq 'Name Information'} @$elements) {
-            my $name = NCIP::StructuredPersonalUserName->new();
-            $name->Surname($user->family_name());
-            $name->GivenName($user->first_given_name());
-            $name->Prefix($user->prefix());
-            $name->Suffix($user->suffix());
-            $optionalfields->NameInformation($name);
-        }
-
-        # Next, check for user address information.
-        if (grep {$_ eq 'User Address Information'} @$elements) {
-            my $addresses = [];
-
-            # See if the user has any valid, physcial addresses.
-            foreach my $addr (@{$user->addresses()}) {
-                next if ($U->is_true($addr->pending()));
-                my $address = NCIP::User::AddressInformation->new({UserAddressRoleType=>$addr->address_type()});
-                my $physical = NCIP::StructuredAddress->new();
-                $physical->Line1($addr->street1());
-                $physical->Line2($addr->street2());
-                $physical->Locality($addr->city());
-                $physical->Region($addr->state());
-                $physical->PostalCode($addr->post_code());
-                $physical->Country($addr->country());
-                $address->PhysicalAddress($physical);
-                push @$addresses, $address;
-            }
-
-            # Right now, we're only sharing email address if the user
-            # has it. We don't share phone numbers.
-            if ($user->email()) {
-                my $address = NCIP::User::AddressInformation->new({UserAddressRoleType=>'Email Address'});
-                $address->ElectronicAddress(
-                    NCIP::ElectronicAddress->new({
-                        Type=>'Email Address',
-                        Data=>$user->email()
-                    })
-                );
-                push @$addresses, $address;
-            }
-
-            $optionalfields->UserAddressInformation($addresses);
-        }
-
-        # Check for User Privilege.
-        if (grep {$_ eq 'User Privilege'} @$elements) {
-            # Get the user's group:
-            my $pgt = $U->simplereq(
-                'open-ils.pcrud',
-                'open-ils.pcrud.retrieve.pgt',
-                $self->{session}->{authtoken},
-                $user->profile()
-            );
-            if ($pgt) {
-                my $privilege = NCIP::User::Privilege->new();
-                $privilege->AgencyId($user->home_ou->shortname());
-                $privilege->AgencyUserPrivilegeType($pgt->name());
-                $privilege->ValidToDate($user->expire_date());
-                $privilege->ValidFromDate($user->create_date());
-
-                my $status = 'Active';
-                if (_expired($user)) {
-                    $status = 'Expired';
-                } elsif ($U->is_true($user->barred())) {
-                    $status = 'Barred';
-                } elsif (!$U->is_true($user->active())) {
-                    $status = 'Inactive';
-                }
-                if ($status) {
-                    $privilege->UserPrivilegeStatus(
-                        NCIP::User::PrivilegeStatus->new({
-                            UserPrivilegeStatusType => $status
-                        })
-                    );
-                }
-
-                $optionalfields->UserPrivilege([$privilege]);
-            }
-        }
-
-        # Check for Block Or Trap.
-        if (grep {$_ eq 'Block Or Trap'} @$elements) {
-            my $blocks = [];
-
-            # First, let's check if the profile is blocked from ILL.
-            if (grep {$_->id() == $user->profile()} @{$self->{blocked_profiles}}) {
-                my $block = NCIP::User::BlockOrTrap->new();
-                $block->AgencyId($user->home_ou->shortname());
-                $block->BlockOrTrapType('Block Interlibrary Loan');
-                push @$blocks, $block;
-            }
-
-            # Next, we loop through the user's standing penalties
-            # looking for blocks on CIRC, HOLD, and RENEW.
-            my ($have_circ, $have_renew, $have_hold) = (0,0,0);
-            foreach my $penalty (@{$user->standing_penalties()}) {
-                next unless($penalty->standing_penalty->block_list());
-                my @block_list = split(/\|/, $penalty->standing_penalty->block_list());
-                my $ou = $U->simplereq(
-                    'open-ils.pcrud',
-                    'open-ils.pcrud.retrieve.aou',
-                    $self->{session}->{authtoken},
-                    $penalty->org_unit()
-                );
-
-                # Block checkout.
-                if (!$have_circ && grep {$_ eq 'CIRC'} @block_list) {
-                    my $bot = NCIP::User::BlockOrTrap->new();
-                    $bot->AgencyId($ou->shortname());
-                    $bot->BlockOrTrapType('Block Checkout');
-                    push @$blocks, $bot;
-                    $have_circ = 1;
-                }
-
-                # Block holds.
-                if (!$have_hold && grep {$_ eq 'HOLD' || $_ eq 'FULFILL'} @block_list) {
-                    my $bot = NCIP::User::BlockOrTrap->new();
-                    $bot->AgencyId($ou->shortname());
-                    $bot->BlockOrTrapType('Block Holds');
-                    push @$blocks, $bot;
-                    $have_hold = 1;
-                }
-
-                # Block renewals.
-                if (!$have_renew && grep {$_ eq 'RENEW'} @block_list) {
-                    my $bot = NCIP::User::BlockOrTrap->new();
-                    $bot->AgencyId($ou->shortname());
-                    $bot->BlockOrTrapType('Block Renewals');
-                    push @$blocks, $bot;
-                    $have_renew = 1;
-                }
-
-                # Stop after we report one of each, even if more
-                # blocks remain.
-                last if ($have_circ && $have_renew && $have_hold);
-            }
-
-            $optionalfields->BlockOrTrap($blocks);
-        }
-
+        my $optionalfields = $self->handle_user_elements($user, $elements);
         $userdata->UserOptionalFields($optionalfields);
     }
 
@@ -1341,6 +1199,164 @@ sub cancelrequestitem {
 }
 
 =head1 METHODS USEFUL to SUBCLASSES
+
+=head2 handle_user_elements
+    $useroptionalfield = $ils->handle_user_elements($user, $elements);
+
+Returns NCIP::User::OptionalFields for the given user and arrayref of
+UserElement.
+
+=cut
+
+sub handle_user_elements {
+    my $self = shift;
+    my $user = shift;
+    my $elements = shift;
+    my $optionalfields = NCIP::User::OptionalFields->new();
+
+    # First, we'll look for name information.
+    if (grep {$_ eq 'Name Information'} @$elements) {
+        my $name = NCIP::StructuredPersonalUserName->new();
+        $name->Surname($user->family_name());
+        $name->GivenName($user->first_given_name());
+        $name->Prefix($user->prefix());
+        $name->Suffix($user->suffix());
+        $optionalfields->NameInformation($name);
+    }
+
+    # Next, check for user address information.
+    if (grep {$_ eq 'User Address Information'} @$elements) {
+        my $addresses = [];
+
+        # See if the user has any valid, physcial addresses.
+        foreach my $addr (@{$user->addresses()}) {
+            next if ($U->is_true($addr->pending()));
+            my $address = NCIP::User::AddressInformation->new({UserAddressRoleType=>$addr->address_type()});
+            my $physical = NCIP::StructuredAddress->new();
+            $physical->Line1($addr->street1());
+            $physical->Line2($addr->street2());
+            $physical->Locality($addr->city());
+            $physical->Region($addr->state());
+            $physical->PostalCode($addr->post_code());
+            $physical->Country($addr->country());
+            $address->PhysicalAddress($physical);
+            push @$addresses, $address;
+        }
+
+        # Right now, we're only sharing email address if the user
+        # has it. We don't share phone numbers.
+        if ($user->email()) {
+            my $address = NCIP::User::AddressInformation->new({UserAddressRoleType=>'Email Address'});
+            $address->ElectronicAddress(
+                NCIP::ElectronicAddress->new({
+                    Type=>'Email Address',
+                    Data=>$user->email()
+                })
+                );
+            push @$addresses, $address;
+        }
+
+        $optionalfields->UserAddressInformation($addresses);
+    }
+
+    # Check for User Privilege.
+    if (grep {$_ eq 'User Privilege'} @$elements) {
+        # Get the user's group:
+        my $pgt = $U->simplereq(
+            'open-ils.pcrud',
+            'open-ils.pcrud.retrieve.pgt',
+            $self->{session}->{authtoken},
+            $user->profile()
+        );
+        if ($pgt) {
+            my $privilege = NCIP::User::Privilege->new();
+            $privilege->AgencyId($user->home_ou->shortname());
+            $privilege->AgencyUserPrivilegeType($pgt->name());
+            $privilege->ValidToDate($user->expire_date());
+            $privilege->ValidFromDate($user->create_date());
+
+            my $status = 'Active';
+            if (_expired($user)) {
+                $status = 'Expired';
+            } elsif ($U->is_true($user->barred())) {
+                $status = 'Barred';
+            } elsif (!$U->is_true($user->active())) {
+                $status = 'Inactive';
+            }
+            if ($status) {
+                $privilege->UserPrivilegeStatus(
+                    NCIP::User::PrivilegeStatus->new({
+                        UserPrivilegeStatusType => $status
+                    })
+                );
+            }
+
+            $optionalfields->UserPrivilege([$privilege]);
+        }
+    }
+
+    # Check for Block Or Trap.
+    if (grep {$_ eq 'Block Or Trap'} @$elements) {
+        my $blocks = [];
+
+        # First, let's check if the profile is blocked from ILL.
+        if (grep {$_->id() == $user->profile()} @{$self->{blocked_profiles}}) {
+            my $block = NCIP::User::BlockOrTrap->new();
+            $block->AgencyId($user->home_ou->shortname());
+            $block->BlockOrTrapType('Block Interlibrary Loan');
+            push @$blocks, $block;
+        }
+
+        # Next, we loop through the user's standing penalties
+        # looking for blocks on CIRC, HOLD, and RENEW.
+        my ($have_circ, $have_renew, $have_hold) = (0,0,0);
+        foreach my $penalty (@{$user->standing_penalties()}) {
+            next unless($penalty->standing_penalty->block_list());
+            my @block_list = split(/\|/, $penalty->standing_penalty->block_list());
+            my $ou = $U->simplereq(
+                'open-ils.pcrud',
+                'open-ils.pcrud.retrieve.aou',
+                $self->{session}->{authtoken},
+                $penalty->org_unit()
+            );
+
+            # Block checkout.
+            if (!$have_circ && grep {$_ eq 'CIRC'} @block_list) {
+                my $bot = NCIP::User::BlockOrTrap->new();
+                $bot->AgencyId($ou->shortname());
+                $bot->BlockOrTrapType('Block Checkout');
+                push @$blocks, $bot;
+                $have_circ = 1;
+            }
+
+            # Block holds.
+            if (!$have_hold && grep {$_ eq 'HOLD' || $_ eq 'FULFILL'} @block_list) {
+                my $bot = NCIP::User::BlockOrTrap->new();
+                $bot->AgencyId($ou->shortname());
+                $bot->BlockOrTrapType('Block Holds');
+                push @$blocks, $bot;
+                $have_hold = 1;
+            }
+
+            # Block renewals.
+            if (!$have_renew && grep {$_ eq 'RENEW'} @block_list) {
+                my $bot = NCIP::User::BlockOrTrap->new();
+                $bot->AgencyId($ou->shortname());
+                $bot->BlockOrTrapType('Block Renewals');
+                push @$blocks, $bot;
+                $have_renew = 1;
+            }
+
+            # Stop after we report one of each, even if more
+            # blocks remain.
+            last if ($have_circ && $have_renew && $have_hold);
+        }
+
+        $optionalfields->BlockOrTrap($blocks);
+    }
+
+    return $optionalfields;
+}
 
 =head2 login
 
