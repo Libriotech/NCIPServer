@@ -1591,20 +1591,26 @@ sub check_user_for_problems {
 
     # Next, check if the patron has one of the indicated blocks.
     unless ($problem) {
-        foreach my $block (@blocks) {
-            if (grep {$_->standing_penalty->block_list() =~ /$block/} @{$user->standing_penalties()}) {
-                $problem = NCIP::Problem->new(
-                    {
-                        ProblemType => 'User Blocked',
-                        ProblemDetail => 'User blocked from ' .
-                            ($block eq 'HOLD') ? 'holds' : (($block eq 'RENEW') ? 'renewals' :
-                                                                (($block eq 'CIRC') ? 'checkout' : lc($block))),
-                        ProblemElement => 'NULL',
-                        ProblemValue => 'NULL'
+        foreach my $penalty (@{$user->standing_penalties()}) {
+            my @pblocks = split(/\|/, $penalty->standing_penalty->block_list());
+            if (@pblocks) {
+                foreach my $block (@blocks) {
+                    if (grep {$_ =~ /$block/} @pblocks) {
+                        $problem = NCIP::Problem->new(
+                            {
+                                ProblemType => 'User Blocked',
+                                ProblemDetail => 'User blocked from ' .
+                                    ($block eq 'HOLD') ? 'holds' : (($block eq 'RENEW') ? 'renewals' :
+                                                                        (($block eq 'CIRC') ? 'checkout' : lc($block))),
+                                ProblemElement => 'NULL',
+                                ProblemValue => 'NULL'
+                            }
+                        );
+                        last;
                     }
-                );
-                last;
+                }
             }
+            last if ($problem);
         }
     }
 
