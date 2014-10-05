@@ -471,7 +471,7 @@ sub checkinitem {
         };
 
         # Look for UserElements requested and add it to the response:
-        my $elements = $request->{$message_type}->{UserElementType};
+        my $elements = $request->{$message}->{UserElementType};
         if ($elements) {
             $elements = [$elements] unless (ref $elements eq 'ARRAY');
             my $optionalfields = $self->handle_user_elements($circ_user, $elements);
@@ -668,7 +668,7 @@ sub renewitem {
         $data->{DateDue} = $due->iso8601();
 
         # Look for UserElements requested and add it to the response:
-        my $elements = $request->{$message_type}->{UserElementType};
+        my $elements = $request->{$message}->{UserElementType};
         if ($elements) {
             $elements = [$elements] unless (ref $elements eq 'ARRAY');
             my $optionalfields = $self->handle_user_elements($user, $elements);
@@ -835,7 +835,7 @@ sub checkoutitem {
         $data->{DateDue} = $due->iso8601();
 
         # Look for UserElements requested and add it to the response:
-        my $elements = $request->{$message_type}->{UserElementType};
+        my $elements = $request->{$message}->{UserElementType};
         if ($elements) {
             $elements = [$elements] unless (ref $elements eq 'ARRAY');
             my $optionalfields = $self->handle_user_elements($user, $elements);
@@ -994,7 +994,7 @@ sub requestitem {
             RequestScopeType => ($hold->hold_type() eq 'V') ? "item" : "bibliographic item"
         };
         # Look for UserElements requested and add it to the response:
-        my $elements = $request->{$message_type}->{UserElementType};
+        my $elements = $request->{$message}->{UserElementType};
         if ($elements) {
             $elements = [$elements] unless (ref $elements eq 'ARRAY');
             my $optionalfields = $self->handle_user_elements($user, $elements);
@@ -1157,7 +1157,7 @@ sub cancelrequestitem {
                     )
                 };
                 # Look for UserElements requested and add it to the response:
-                my $elements = $request->{$message_type}->{UserElementType};
+                my $elements = $request->{$message}->{UserElementType};
                 if ($elements) {
                     $elements = [$elements] unless (ref $elements eq 'ARRAY');
                     my $optionalfields = $self->handle_user_elements($user, $elements);
