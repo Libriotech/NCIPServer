@@ -1592,8 +1592,8 @@ sub check_user_for_problems {
     # Next, check if the patron has one of the indicated blocks.
     unless ($problem) {
         foreach my $penalty (@{$user->standing_penalties()}) {
-            my @pblocks = split(/\|/, $penalty->standing_penalty->block_list());
-            if (@pblocks) {
+            if ($penalty->standing_penalty->block_list()) {
+                my @pblocks = split(/\|/, $penalty->standing_penalty->block_list());
                 foreach my $block (@blocks) {
                     if (grep {$_ =~ /$block/} @pblocks) {
                         $problem = NCIP::Problem->new(
@@ -1609,8 +1609,8 @@ sub check_user_for_problems {
                         last;
                     }
                 }
+                last if ($problem);
             }
-            last if ($problem);
         }
     }
 
