@@ -52,6 +52,11 @@ use NCIP::StructuredAddress;
 use NCIP::ElectronicAddress;
 use NCIP::RequestId;
 use NCIP::Item::Id;
+use NCIP::Item::OptionalFields;
+use NCIP::Item::BibliographicDescription;
+use NCIP::Item::BibliographicItemId;
+use NCIP::Item::BibliographicRecordId;
+use NCIP::Item::Description;
 
 # Inherit from NCIP::ILS.
 use parent qw(NCIP::ILS);
@@ -477,6 +482,12 @@ sub checkinitem {
             my $optionalfields = $self->handle_user_elements($circ_user, $elements);
             $data->{UserOptionalFields} = $optionalfields;
         }
+        $elements = $request->{$message}->{ItemElementType};
+        if ($elements) {
+            $elements = [$elements] unless (ref $elements eq 'ARRAY');
+            my $optionalfields = $self->handle_item_elements($copy, $elements);
+            $data->{ItemOptionalFields} = $optionalfields;
+        }
 
         $response->data($data);
 
@@ -674,6 +685,12 @@ sub renewitem {
             my $optionalfields = $self->handle_user_elements($user, $elements);
             $data->{UserOptionalFields} = $optionalfields;
         }
+        $elements = $request->{$message}->{ItemElementType};
+        if ($elements) {
+            $elements = [$elements] unless (ref $elements eq 'ARRAY');
+            my $optionalfields = $self->handle_item_elements($details->{copy}, $elements);
+            $data->{ItemOptionalFields} = $optionalfields;
+        }
 
         $response->data($data);
     }
@@ -841,6 +858,12 @@ sub checkoutitem {
             my $optionalfields = $self->handle_user_elements($user, $elements);
             $data->{UserOptionalFields} = $optionalfields;
         }
+        $elements = $request->{$message}->{ItemElementType};
+        if ($elements) {
+            $elements = [$elements] unless (ref $elements eq 'ARRAY');
+            my $optionalfields = $self->handle_item_elements($details->{copy}, $elements);
+            $data->{ItemOptionalFields} = $optionalfields;
+        }
 
         $response->data($data);
     }
@@ -999,6 +1022,12 @@ sub requestitem {
             $elements = [$elements] unless (ref $elements eq 'ARRAY');
             my $optionalfields = $self->handle_user_elements($user, $elements);
             $data->{UserOptionalFields} = $optionalfields;
+        }
+        $elements = $request->{$message}->{ItemElementType};
+        if ($elements && $copy_details) {
+            $elements = [$elements] unless (ref($elements) eq 'ARRAY');
+            my $optionalfields = $self->handle_item_elements($copy_details->{copy}, $elements);
+            $data->{ItemOptionalFields} = $optionalfields;
         }
 
         $response->data($data);
@@ -1163,6 +1192,12 @@ sub cancelrequestitem {
                     my $optionalfields = $self->handle_user_elements($user, $elements);
                     $data->{UserOptionalFields} = $optionalfields;
                 }
+                $elements = $request->{$message}->{ItemElementType};
+                if ($elements && $copy_details) {
+                    $elements = [$elements] unless (ref $elements eq 'ARRAY');
+                    my $optionalfields = $self->handle_item_elements($copy_details->{copy}, $elements);
+                    $data->{ItemOptionalFields} = $optionalfields;
+                }
                 $response->data($data);
             }
         } else {
@@ -1202,22 +1237,34 @@ sub cancelrequestitem {
                 )
             } elsif ($hold) {
                 $self->cancel_hold($hold);
-                $response->data(
-                    {
-                        RequestId => NCIP::RequestId->new(
-                            {
-                                RequestIdentifierType => 'SYSNUMBER',
-                                RequestIdentifierValue => $hold->id()
-                            }
-                        ),
-                        UserId => NCIP::User::Id->new(
-                            {
-                                UserIdentifierType => 'Barcode Id',
-                                UserIdentifierValue => $user->card->barcode()
-                            }
-                        )
-                    }
-                )
+                my $data = {
+                    RequestId => NCIP::RequestId->new(
+                        {
+                            RequestIdentifierType => 'SYSNUMBER',
+                            RequestIdentifierValue => $hold->id()
+                        }
+                    ),
+                    UserId => NCIP::User::Id->new(
+                        {
+                            UserIdentifierType => 'Barcode Id',
+                            UserIdentifierValue => $user->card->barcode()
+                        }
+                    )
+                };
+                # Look for UserElements requested and add it to the response:
+                my $elements = $request->{$message}->{UserElementType};
+                if ($elements) {
+                    $elements = [$elements] unless (ref $elements eq 'ARRAY');
+                    my $optionalfields = $self->handle_user_elements($user, $elements);
+                    $data->{UserOptionalFields} = $optionalfields;
+                }
+                $elements = $request->{$message}->{ItemElementType};
+                if ($elements && $copy_details) {
+                    $elements = [$elements] unless (ref $elements eq 'ARRAY');
+                    my $optionalfields = $self->handle_item_elements($copy_details->{copy}, $elements);
+                    $data->{ItemOptionalFields} = $optionalfields;
+                }
+                $response->data($data);
             } else {
                 $response->problem(
                     NCIP::Problem->new(
@@ -1391,6 +1438,103 @@ sub handle_user_elements {
         }
 
         $optionalfields->BlockOrTrap($blocks);
+    }
+
+    return $optionalfields;
+}
+
+=head2 handle_item_elements
+
+=cut
+
+sub handle_item_elements {
+    my $self = shift;
+    my $copy = shift;
+    my $elments = shift;
+    my $optionalfields = NCIP::Item::OptionalFields->new();
+
+    my $details; # In case we need for more than one.
+
+    if (grep {$_ eq 'Bibliographic Description'} @$elements) {
+        my $description;
+        # Check for a precat copy, 'cause it is simple.
+        if ($copy->dummy_title()) {
+            $description = NCIP::Item::BibliographicDescription->new();
+            $description->Title($copy->dummy_title());
+            $description->Author($copy->dummy_author());
+            if ($copy->dummy_isbn()) {
+                $description->BibliographicItemId(
+                    NCIP::Item::BibliographicItemId->new(
+                        BibliographicItemIdentifier => $copy->dummy_isbn(),
+                        BibliographicItemIdentifierCode => 'ISBN'
+                    )
+                );
+            }
+        } else {
+            $details = $self->retrieve_copy_details_by_barcode($copy->barcode()) unless($details);
+            $description = NCIP::Item::BibliographicDescription->new();
+            $description->Title($details->{mvr}->title());
+            $description->Authort($details->{mvr}->author());
+            $description->BibliographicRecordId(
+                NCIP::Item::BibliographicRecordId->new(
+                    BibliographicRecordIdentifier => $details->{mvr}->doc_id(),
+                    BibliographicRecordIdentifierCode => 'SYSNUMBER'
+                )
+            );
+            if ($details->{mvr}->publisher()) {
+                $description->Publisher($details->{mvr}->publisher());
+            }
+            if ($details->{mvr}->pubdate()) {
+                $description->PublicationDate($details->{mvr}->pubdate());
+            }
+            if ($details->{mvr}->edition()) {
+                $description->Edition($details->{mvr}->edition());
+            }
+        }
+        $optionalfields->BibliographicDescription($description) if ($description);
+    }
+
+    if (grep {$_ eq 'Item Description'} @$elements) {
+        $details = $self->retrieve_copy_details_by_barcode($copy->barcode()) unless($details);
+        # Call Number is the only field we currently return. We also
+        # do not attempt to retun a prefix and suffix. Someone else
+        # can deal with that if they want it.
+        if ($details->{volume}) {
+            $optionalfields->ItemDescription(
+                NCIP::Item::Description->new(
+                    CallNumber => $details->{volume}->label();
+                )
+            );
+        }
+    }
+
+    if (grep {$_ eq 'Circulation Status'} @$elements) {
+        my $status = $copy->status();
+        $status = $self->retrieve_copy_status($status) unless (ref($status));
+        $optionalfields->CirculationStatus($status->name()) if ($status);
+    }
+
+    if (grep {$_ eq 'Date Due'} @$elements) {
+        $details = $self->retrieve_copy_details_by_barcode($copy->barcode()) unless($details);
+        if ($details->{circ}) {
+            if (!$details->{circ}->checkin_time()) {
+                my $due = DateTime::Format::ISO8601->parse_datetime(cleanse_ISO8601($circ->due_date()));
+                $due->set_time_zone('UTC');
+                $optionalfields->DateDue($due->iso8601());
+            }
+        }
+    }
+
+    if (grep {$_ eq 'Item Use Restriction Type'} @$elements) {
+        $optionalfields->ItemUseRestrictionType('None');
+    }
+
+    if (grep {$_ eq 'Physical Condition'} @$elements) {
+        $optionalfields->PhysicalCondition(
+            NCIP::Item::PhysicalCondition->new(
+                PhysicalConditionType => 'Unknown'
+            )
+        );
     }
 
     return $optionalfields;
@@ -1705,6 +1849,28 @@ sub retrieve_copy_details_by_barcode {
     }
 
     return $copy;
+}
+
+=head2 retrieve_copy_status
+
+    $status = $ils->retrieve_copy_status($id);
+
+Retrive a copy status object by database ID.
+
+=cut
+
+sub retrieve_copy_status {
+    my $self = shift;
+    my $id = shift;
+
+    my $status = $U->simplereq(
+        'open-ils.pcrud',
+        'open-ils.pcrud.retrieve.ccs',
+        $self->{session}->{authtoken},
+        $id
+    );
+
+    return $status;
 }
 
 =head2 retrieve_org_unit_by_shortname
