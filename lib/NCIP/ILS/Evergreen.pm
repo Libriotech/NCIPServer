@@ -931,11 +931,14 @@ sub requestitem {
     # This here is the thing we're going to put on hold:
     my $item;
 
+    # We need copy details if we find in a couple of places below.
+    my $copy_details;
+
     # We need the copy barcode from the message.
     my ($item_barcode, $item_idfield) = $self->find_item_barcode($request);
     if (ref($item_barcode) ne 'NCIP::Problem') {
         # Retrieve the copy details.
-        my $copy_details = $self->retrieve_copy_details_by_barcode($item_barcode);
+        $copy_details = $self->retrieve_copy_details_by_barcode($item_barcode);
         unless ($copy_details) {
             # Return an Unknown Item problem unless we find the copy.
             $response->problem(
@@ -1450,7 +1453,7 @@ sub handle_user_elements {
 sub handle_item_elements {
     my $self = shift;
     my $copy = shift;
-    my $elments = shift;
+    my $elements = shift;
     my $optionalfields = NCIP::Item::OptionalFields->new();
 
     my $details; # In case we need for more than one.
@@ -1518,7 +1521,7 @@ sub handle_item_elements {
         $details = $self->retrieve_copy_details_by_barcode($copy->barcode()) unless($details);
         if ($details->{circ}) {
             if (!$details->{circ}->checkin_time()) {
-                my $due = DateTime::Format::ISO8601->parse_datetime(cleanse_ISO8601($circ->due_date()));
+                my $due = DateTime::Format::ISO8601->parse_datetime(cleanse_ISO8601($details->{circ}->due_date()));
                 $due->set_time_zone('UTC');
                 $optionalfields->DateDue($due->iso8601());
             }
