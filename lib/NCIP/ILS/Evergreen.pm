@@ -1007,8 +1007,10 @@ sub requestitem {
     } else {
         my $data = {
             RequestId => NCIP::RequestId->new(
-                RequestIdentifierType => 'SYSNUMBER',
-                RequestIdentifierValue => $hold->id()
+                {
+                    RequestIdentifierType => 'SYSNUMBER',
+                    RequestIdentifierValue => $hold->id()
+                }
             ),
             UserId => NCIP::User::Id->new(
                 {
