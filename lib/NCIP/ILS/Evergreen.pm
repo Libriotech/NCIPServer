@@ -1468,8 +1468,10 @@ sub handle_item_elements {
             if ($copy->dummy_isbn()) {
                 $description->BibliographicItemId(
                     NCIP::Item::BibliographicItemId->new(
-                        BibliographicItemIdentifier => $copy->dummy_isbn(),
-                        BibliographicItemIdentifierCode => 'ISBN'
+                        {
+                            BibliographicItemIdentifier => $copy->dummy_isbn(),
+                            BibliographicItemIdentifierCode => 'ISBN'
+                        }
                     )
                 );
             }
@@ -1480,8 +1482,10 @@ sub handle_item_elements {
             $description->Authort($details->{mvr}->author());
             $description->BibliographicRecordId(
                 NCIP::Item::BibliographicRecordId->new(
-                    BibliographicRecordIdentifier => $details->{mvr}->doc_id(),
-                    BibliographicRecordIdentifierCode => 'SYSNUMBER'
+                    {
+                        BibliographicRecordIdentifier => $details->{mvr}->doc_id(),
+                        BibliographicRecordIdentifierCode => 'SYSNUMBER'
+                    }
                 )
             );
             if ($details->{mvr}->publisher()) {
@@ -1505,7 +1509,7 @@ sub handle_item_elements {
         if ($details->{volume}) {
             $optionalfields->ItemDescription(
                 NCIP::Item::Description->new(
-                    CallNumber => $details->{volume}->label();
+                    {CallNumber => $details->{volume}->label()}
                 )
             );
         }
@@ -1535,7 +1539,7 @@ sub handle_item_elements {
     if (grep {$_ eq 'Physical Condition'} @$elements) {
         $optionalfields->PhysicalCondition(
             NCIP::Item::PhysicalCondition->new(
-                PhysicalConditionType => 'Unknown'
+                {PhysicalConditionType => 'Unknown'}
             )
         );
     }
