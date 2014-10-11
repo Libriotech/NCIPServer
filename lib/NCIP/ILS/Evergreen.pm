@@ -1482,7 +1482,7 @@ sub handle_item_elements {
             $details = $self->retrieve_copy_details_by_barcode($copy->barcode()) unless($details);
             $description = NCIP::Item::BibliographicDescription->new();
             $description->Title($details->{mvr}->title());
-            $description->Authort($details->{mvr}->author());
+            $description->Author($details->{mvr}->author());
             $description->BibliographicRecordId(
                 NCIP::Item::BibliographicRecordId->new(
                     {
