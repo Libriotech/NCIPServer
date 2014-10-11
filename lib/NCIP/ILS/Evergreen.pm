@@ -1906,7 +1906,7 @@ sub find_copy_details_by_item {
         ($item) = sort {$a->id() <=> $b->id()} @{$copies};
     }
 
-    if (ref(item) eq 'Fieldmapper::asset::copy') {
+    if (ref($item) eq 'Fieldmapper::asset::copy') {
         $details = $self->retrieve_copy_details_by_barcode($item->barcode());
     }
 
