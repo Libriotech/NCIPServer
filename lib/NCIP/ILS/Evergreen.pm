@@ -635,7 +635,7 @@ sub renewitem {
     # user is not allowed to renew this item, without getting into
     # details.
     my $params = {
-        copy => $copy,
+        copy_id => $copy->id(),
         patron_id => $user->id(),
         sip_renewal => 1
     };
