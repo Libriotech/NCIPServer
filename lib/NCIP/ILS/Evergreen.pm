@@ -2339,7 +2339,7 @@ sub place_hold {
             # database to return it.
             $hold = $U->simplereq(
                 'open-ils.pcrud',
-                'open-ils.pcrud.ahr.retrieve',
+                'open-ils.pcrud.retrieve.ahr',
                 $self->{session}->{authtoken},
                 $hold
             );
