@@ -19,3 +19,4 @@
 </UserId>
 [% END -%]
 [% INCLUDE "includes/UserOptionalFields.inc" -%]
+[% INCLUDE "includes/ItemOptionalFields.inc" -%]
