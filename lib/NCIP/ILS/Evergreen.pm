@@ -2745,7 +2745,7 @@ sub _call_number_search {
     # such with results ordered by proximity to the original location,
     # but I don't have time to implement that right now.
     my $acn = $U->simplereq(
-        'open-ils.prcud',
+        'open-ils.pcrud',
         'open-ils.pcrud.search.acn',
         $self->{session}->{authtoken},
         {record => $bibid, owning_lib => $location->id()}
