@@ -2551,7 +2551,8 @@ sub find_target_via_bibliographic_id {
 
     # First, let's look for a SYSNUMBER:
     my ($idobj) = grep
-        { $_->{BibliographicRecordIdentifierCode} eq 'SYSNUMBER' || $_->{BibliographicItemIdentifierCode} eq 'SYSNUMBER'
+        { ($_->{BibliographicRecordIdentifierCode} && $_->{BibliographicRecordIdentifierCode} eq 'SYSNUMBER')
+              || ($_->{BibliographicItemIdentifierCode} && $_->{BibliographicItemIdentifierCode} eq 'SYSNUMBER')
               || $_->{AgencyId} }
             @biblio_ids;
     if ($idobj) {
@@ -2588,9 +2589,10 @@ sub find_target_via_bibliographic_id {
     # Build an array of id objects based on the other identifier fields.
     my @idobjs = grep
         {
-            $_->{BibliographicRecordIdentifierCode} eq 'ISBN' || $_->{BibliographicItemIdentifierCode} eq 'ISBN'
-            ||
-            $_->{BibliographicRecordIdentifierCode} eq 'ISSN' || $_->{BibliographicItemIdentifierCode} eq 'ISSN'
+            ($_->{BibliographicRecordIdentifierCode} && $_->{BibliographicRecordIdentifierCode} eq 'ISBN')
+                || ($_->{BibliographicItemIdentifierCode} && $_->{BibliographicItemIdentifierCode} eq 'ISBN')
+                || ($_->{BibliographicRecordIdentifierCode} && $_->{BibliographicRecordIdentifierCode} eq 'ISSN')
+                || ($_->{BibliographicItemIdentifierCode} && $_->{BibliographicItemIdentifierCode} eq 'ISSN')
         } @biblio_ids;
 
     if (@idobjs) {
