@@ -2330,8 +2330,19 @@ sub place_hold {
             $self->{session}->{authtoken},
             $hold
         );
-        if (ref($hold) eq 'HASH') {
+        if (ref($hold)) {
+            $hold = $hold->[0] if (ref($hold) eq 'ARRAY');
             $hold = _problem_from_event('Request Not Possible', $hold);
+        } else {
+            # open-ils.circ.holds.create.override returns the id on
+            # success, so we retrieve the full hold object from the
+            # database to return it.
+            $hold = $U->simplereq(
+                'open-ils.pcrud',
+                'open-ils.pcrud.ahr.retrieve',
+                $self->{session}->{authtoken},
+                $hold
+            );
         }
     } elsif ($r->{last_event}) {
         $hold = _problem_from_event('Request Not Possible', $r->{last_event});
