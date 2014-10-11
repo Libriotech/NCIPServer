@@ -809,7 +809,7 @@ sub checkoutitem {
     # the user is not allowed to check out this item, without getting
     # into details.
     my $params = {
-        copy => $copy,
+        copy_id => $copy->id(),
         patron_id => $user->id(),
     };
     my $r = $U->simplereq(
