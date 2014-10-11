@@ -1029,7 +1029,8 @@ sub requestitem {
             $data->{UserOptionalFields} = $optionalfields;
         }
         $elements = $request->{$message}->{ItemElementType};
-        if ($elements && $copy_details) {
+        if ($elements) {
+            $copy_details = $self->find_copy_details_by_item($item) unless ($copy_details);
             $elements = [$elements] unless (ref($elements) eq 'ARRAY');
             my $optionalfields = $self->handle_item_elements($copy_details->{copy}, $elements);
             $data->{ItemOptionalFields} = $optionalfields;
@@ -1858,6 +1859,58 @@ sub retrieve_copy_details_by_barcode {
     }
 
     return $copy;
+}
+
+=head2 find_copy_details_by_item
+
+    $copy_details = $ils->find_copy_details_by_item($item);
+
+This routine returns a copy_details hashref (See:
+retrieve_copy_details_by_barcode) for a given item. It attempts to
+find the "first" copy for the given item. If item is a call number it
+looks for the first, not deleted copy. If item is a bib, it looks for
+the first not deleted copy on the first not deleted call number. If
+item is a copy, it simply returns the details for the copy.
+
+=cut
+
+sub find_copy_details_by_item {
+    my $self = shift;
+    my $item = shift;
+
+    my ($details);
+
+    if (ref($item) eq 'Fieldmapper::biblio::record_entry') {
+        my $acns = $U->simplereq(
+            'open-ils.pcrud',
+            'open-ils.pcrud.search.acn.atomic',
+            $self->{session}->{authtoken},
+            {
+                record => $item->id(),
+                deleted => 'f'
+            }
+        );
+        ($item) = sort {$a->id() <=> $b->id()} @{$acns};
+    }
+
+    if (ref($item) eq 'Fieldmapper::asset::call_number') {
+        my $copies = $U->simplereq(
+            'open-ils.pcrud',
+            'open-ils.pcrud.search.acp.atomic',
+            $self->{session}->{authtoken},
+            {
+                call_number => $item->id(),
+                deleted => 'f'
+            }
+        );
+        ($item) = sort {$a->id() <=> $b->id()} @{$copies};
+    }
+
+    if (ref(item) eq 'Fieldmapper::asset::copy') {
+        $details = $self->retrieve_copy_details_by_barcode($item->barcode());
+    }
+
+    return $details;
 }
 
 =head2 retrieve_copy_status
