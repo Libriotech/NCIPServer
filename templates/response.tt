@@ -1,3 +1,4 @@
+<[% type %]>
 [% IF header;
       INCLUDE "includes/ResponseHeader.inc";
    END;
@@ -7,3 +8,4 @@
       INCLUDE "includes/problem.inc";
    END;
 -%]
+</[% type %]>
