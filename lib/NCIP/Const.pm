@@ -26,6 +26,6 @@ use constant SUPPORTED_VERSIONS => (
 
 # Messages for which AuthenticationInput are valid.
 use constant AUTHENTICATIONINPUT_MESSAGES => (
-    'LookUpUser', 'RenewItem', 'CheckOutItem', 'RequestItem',
+    'LookupUser', 'RenewItem', 'CheckOutItem', 'RequestItem',
 );
 1;
