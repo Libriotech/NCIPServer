@@ -50,6 +50,7 @@ use NCIP::User::PrivilegeStatus;
 use NCIP::StructuredPersonalUserName;
 use NCIP::StructuredAddress;
 use NCIP::ElectronicAddress;
+use NCIP::PhysicalAddress;
 use NCIP::RequestId;
 use NCIP::Item::Id;
 use NCIP::Item::OptionalFields;
@@ -1319,14 +1320,21 @@ sub handle_user_elements {
         foreach my $addr (@{$user->addresses()}) {
             next if ($U->is_true($addr->pending()));
             my $address = NCIP::User::AddressInformation->new({UserAddressRoleType=>$addr->address_type()});
-            my $physical = NCIP::StructuredAddress->new();
-            $physical->Line1($addr->street1());
-            $physical->Line2($addr->street2());
-            $physical->Locality($addr->city());
-            $physical->Region($addr->state());
-            $physical->PostalCode($addr->post_code());
-            $physical->Country($addr->country());
-            $address->PhysicalAddress($physical);
+            my $structured = NCIP::StructuredAddress->new();
+            $structured->Line1($addr->street1());
+            $structured->Line2($addr->street2());
+            $structured->Locality($addr->city());
+            $structured->Region($addr->state());
+            $structured->PostalCode($addr->post_code());
+            $structured->Country($addr->country());
+            $address->PhysicalAddress(
+                NCIP::PhysicalAddress->new(
+                    {
+                        StructuredAddress => $structured,
+                        Type => 'Postal Address'
+                    }
+                )
+            );
             push @$addresses, $address;
         }
 
