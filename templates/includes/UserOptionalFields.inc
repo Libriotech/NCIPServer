@@ -28,24 +28,24 @@
 [% IF element.PhysicalAddress -%]
 <PhysicalAddress>
 <StructuredAddress>
-<Line1>[% element.PhysicalAddress.Line1 | xml %]</Line1>
-[% IF element.PhysicalAddress.Line2 -%]
-<Line2>[% element.PhysicalAddress.Line2 | xml %]</Line2>
+<Line1>[% element.PhysicalAddress.StructuredAddress.Line1 | xml %]</Line1>
+[% IF element.PhysicalAddress.StructuredAddress.Line2 -%]
+<Line2>[% element.PhysicalAddress.StructuredAddress.Line2 | xml %]</Line2>
 [% END -%]
-[% IF element.PhysicalAddress.Locality -%]
-<Locality>[% element.PhysicalAddress.Locality | xml %]</Locality>
+[% IF element.PhysicalAddress.StructuredAddress.Locality -%]
+<Locality>[% element.PhysicalAddress.StructuredAddress.Locality | xml %]</Locality>
 [% END -%]
-[% IF element.PhysicalAddress.Region -%]
-<Region>[% element.PhysicalAddress.Region | xml %]</Region>
+[% IF element.PhysicalAddress.StructuredAddress.Region -%]
+<Region>[% element.PhysicalAddress.StructuredAddress.Region | xml %]</Region>
 [% END -%]
-[% IF element.PhysicalAddress.Country -%]
-<Country>[% element.PhysicalAddress.Country | xml %]</Country>
+[% IF element.PhysicalAddress.StructuredAddress.Country -%]
+<Country>[% element.PhysicalAddress.StructuredAddress.Country | xml %]</Country>
 [% END -%]
-[% IF element.PhysicalAddress.PostalCode -%]
-<PostalCode>[% element.PhysicalAddress.PostalCode | xml %]</PostalCode>
+[% IF element.PhysicalAddress.StructuredAddress.PostalCode -%]
+<PostalCode>[% element.PhysicalAddress.StructuredAddress.PostalCode | xml %]</PostalCode>
 [% END -%]
 </StructuredAddress>
-<PhysicalAddressType>Postal Address</PhysicalAddressType>
+<PhysicalAddressType>[% element.PhysicalAddress.Type | xml %]</PhysicalAddressType>
 </PhysicalAddress>
 [% ELSIF element.ElectronicAddress -%]
 <ElectronicAddress>

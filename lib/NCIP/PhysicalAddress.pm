@@ -16,13 +16,13 @@
 # You should have received a copy of the GNU General Public License
 # along with NCIPServer.  If not, see <http://www.gnu.org/licenses/>.
 # ---------------------------------------------------------------
-package NCIP::User::AddressInformation;
-
+package NCIP::PhysicalAddress;
 use parent qw(Class::Accessor);
+
 
 =head1 NAME
 
-AddressInformation - A user's Address Information
+PhysicalAddress - A "PhysicalAddress" as defined by Z39.83-1-2012
 
 =head1 SYNOPSIS
 
@@ -30,29 +30,26 @@ AddressInformation - A user's Address Information
 
 =head1 DESCRIPTION
 
+This a "PhysicalAddress" as defined by Z39.83-1-2012.  It is used
+for returning user address information when requested.  The fields
+are as defined in the standard.
+
 =head1 FIELDS
 
-Either one of PhysicalAddress or ElectronicAddress must be defined,
-and they are mutually exclusive, i.e. if one has a value defined, the
-other must be undefined.
+=head2 StructuredAddress
 
-=head2 UserAddressRoleType
+A NCIP::StructuredAddress object to hold the actual address.
 
-A text string to indicate the role of the address.
+=head2 UnstructuredAddress
 
-=head2 PhysicalAddress
+Not presently implemented.
 
-A physical address stored in a NCIP::PhysicalAddress.
+=head2 Type
 
-=head2 ElectronicAddress
-
-An electronic address or phone number stored in a
-NCIP::ElectronicAddress.
+The PhysicalAddressType field. Usually "Postal Address" or "Street Address."
 
 =cut
 
-NCIP::User::AddressInformation->mk_accessors(
-    qw(UserAddressRoleType PhysicalAddress ElectronicAddress)
-);
+NCIP::PhysicalAddress->mk_accessors(qw(StructuredAddress Type));
 
 1;
