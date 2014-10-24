@@ -1,21 +1,21 @@
-<RequestId>
+<ncip:RequestId>
 [% IF data.RequestId.AgencyId -%]
-<AgencyId>[% data.RequestId.AgencyId | xml %]</AgencyId>
+<ncip:AgencyId>[% data.RequestId.AgencyId | xml %]</ncip:AgencyId>
 [% END -%]
 [% IF data.RequestId.RequestIdentifierType -%]
-<RequestIdentifierType>[% data.RequestId.RequestIdentifierType | xml %]</RequestIdentifierType>
+<ncip:RequestIdentifierType>[% data.RequestId.RequestIdentifierType | xml %]</ncip:RequestIdentifierType>
 [% END -%]
-<RequestIdentifierValue>[% data.RequestId.RequestIdentifierValue | xml %]</RequestIdentifierValue>
-</RequestId>
+<ncip:RequestIdentifierValue>[% data.RequestId.RequestIdentifierValue | xml %]</ncip:RequestIdentifierValue>
+</ncip:RequestId>
 [% IF data.ItemId -%]
-<ItemId>
+<ncip:ItemId>
 [% IF data.ItemId.AgencyId -%]
-<AgencyId>[% data.ItemId.AgencyId | xml %]</AgencyId>
+<ncip:AgencyId>[% data.ItemId.AgencyId | xml %]</ncip:AgencyId>
 [% END -%]
 [% IF data.ItemId.ItemIdentifierType -%]
-<ItemIdentifierType>[% data.ItemId.ItemIdentifierType | xml %]</ItemIdentifierType>
+<ncip:ItemIdentifierType>[% data.ItemId.ItemIdentifierType | xml %]</ncip:ItemIdentifierType>
 [% END -%]
-<ItemIdentifierValue>[% data.ItemId.ItemIdentifierValue | xml %]</ItemIdentifierValue>
-</ItemId>
+<ncip:ItemIdentifierValue>[% data.ItemId.ItemIdentifierValue | xml %]</ncip:ItemIdentifierValue>
+</ncip:ItemId>
 [% END -%]
 [% INCLUDE "includes/UserOptionalFields.inc" -%]

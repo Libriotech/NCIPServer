@@ -1,22 +1,22 @@
-<RequestId>
+<ncip:RequestId>
 [% IF data.RequestId.AgencyId -%]
-<AgencyId>[% data.RequestId.AgencyId | xml %]</AgencyId>
+<ncip:AgencyId>[% data.RequestId.AgencyId | xml %]</ncip:AgencyId>
 [% END -%]
-<RequestIdentifierValue>[% data.RequestId.RequestIdentifierValue | xml %]</RequestIdentifierValue>
+<ncip:RequestIdentifierValue>[% data.RequestId.RequestIdentifierValue | xml %]</ncip:RequestIdentifierValue>
 [% IF data.RequestId.RequestIdentifierType -%]
-<RequestIdentifierType>[% data.RequestId.RequestIdentifierType | xml %]</RequestIdentifierType>
+<ncip:RequestIdentifierType>[% data.RequestId.RequestIdentifierType | xml %]</ncip:RequestIdentifierType>
 [% END %]
-</RequestId>
-<UserId>
+</ncip:RequestId>
+<ncip:UserId>
 [% IF data.UserId.AgencyId -%]
-<AgencyId>[% data.UserId.AgencyId | xml %]</AgencyId>
+<ncip:AgencyId>[% data.UserId.AgencyId | xml %]</ncip:AgencyId>
 [% END -%]
-<UserIdentifierValue>[% data.UserId.UserIdentifierValue | xml %]</UserIdentifierValue>
+<ncip:UserIdentifierValue>[% data.UserId.UserIdentifierValue | xml %]</ncip:UserIdentifierValue>
 [% IF data.UserId.UserIdentifierType -%]
-<UserIdentifierType>[% data.UserId.UserIdentifierType | xml %]</UserIdentiferiType>
+<ncip:UserIdentifierType>[% data.UserId.UserIdentifierType | xml %]</ncip:UserIdentiferiType>
 [% END -%]
-</UserId>
-<RequestType>[% data.RequestType | xml %]</RequestType>
-<RequestScopeType>[% data.RequestScopeType | xml %]</RequestScopeType>
+</ncip:UserId>
+<ncip:RequestType>[% data.RequestType | xml %]</ncip:RequestType>
+<ncip:RequestScopeType>[% data.RequestScopeType | xml %]</ncip:RequestScopeType>
 [% INCLUDE "includes/UserOptionalFields.inc" -%]
 [% INCLUDE "includes/ItemOptionalFields.inc" -%]

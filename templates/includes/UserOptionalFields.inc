@@ -1,107 +1,108 @@
 [% IF data.UserOptionalFields -%]
-<UserOptionalFields>
+<ncip:UserOptionalFields>
 [% IF data.UserOptionalFields.NameInformation -%]
-<NameInformation>
-<PersonalNameInformation>
-<StructuredPersonalUserName>
+<ncip:NameInformation>
+<ncip:PersonalNameInformation>
+<ncip:StructuredPersonalUserName>
 [% IF data.UserOptionalFields.NameInformation.GivenName -%]
-<GivenName>[% data.UserOptionalFields.NameInformation.GivenName | xml %]</GivenName>
+<ncip:GivenName>[% data.UserOptionalFields.NameInformation.GivenName | xml %]</ncip:GivenName>
 [% END -%]
-<Surname>[% data.UserOptionalFields.NameInformation.Surname | xml %]</Surname>
+<ncip:Surname>[% data.UserOptionalFields.NameInformation.Surname | xml %]</ncip:Surname>
 [% IF data.UserOptionalFields.NameInformation.Prefix -%]
-<Prefix>[% data.UserOptionalFields.NameInformation.Prefix %]</Prefix>
+<ncip:Prefix>[% data.UserOptionalFields.NameInformation.Prefix %]</ncip:Prefix>
 [% END -%]
 [% IF data.UserOptionalFields.NameInformation.Suffix -%]
-<Suffix>[% data.UserOptionalFields.NameInformation.Suffix %]</Suffix>
+<ncip:Suffix>[% data.UserOptionalFields.NameInformation.Suffix %]</ncip:Suffix>
 [% END -%]
 [% IF data.UserOptionalFields.NameInformation.Initials -%]
-<Initials>[% data.UserOptionalFields.NameInformation.Initials %]</Initials>
+<ncip:Initials>[% data.UserOptionalFields.NameInformation.Initials %]</ncip:Initials>
 [% END -%]
-</StructuredPersonalUserName>
-</PersonalNameInformation>
-</NameInformation>
+</ncip:StructuredPersonalUserName>
+</ncip:PersonalNameInformation>
+</ncip:NameInformation>
 [% END -%]
 [% IF data.UserOptionalFields.UserAddressInformation -%]
 [% FOREACH element IN data.UserOptionalFields.UserAddressInformation -%]
-<UserAddressInformation>
-<UserAddressRoleType>[% element.UserAddressRoleType | xml %]</UserAddressRoleType>
+<ncip:UserAddressInformation>
+<ncip:UserAddressRoleType>[% element.UserAddressRoleType | xml %]</ncip:UserAddressRoleType>
 [% IF element.PhysicalAddress -%]
-<PhysicalAddress>
-<StructuredAddress>
-<Line1>[% element.PhysicalAddress.Line1 | xml %]</Line1>
+<ncip:PhysicalAddress>
+<ncip:StructuredAddress>
+<ncip:Line1>[% element.PhysicalAddress.Line1 | xml %]</ncip:Line1>
 [% IF element.PhysicalAddress.Line2 -%]
-<Line2>[% element.PhysicalAddress.Line2 | xml %]</Line2>
+<ncip:Line2>[% element.PhysicalAddress.Line2 | xml %]</ncip:Line2>
 [% END -%]
 [% IF element.PhysicalAddress.Locality -%]
-<Locality>[% element.PhysicalAddress.Locality | xml %]</Locality>
+<ncip:Locality>[% element.PhysicalAddress.Locality | xml %]</ncip:Locality>
 [% END -%]
 [% IF element.PhysicalAddress.Region -%]
-<Region>[% element.PhysicalAddress.Region | xml %]</Region>
-[% END -%]
-[% IF element.PhysicalAddress.PostalCode -%]
-<PostalCode>[% element.PhysicalAddress.PostalCode | xml %]</PostalCode>
+<ncip:Region>[% element.PhysicalAddress.Region | xml %]</ncip:Region>
 [% END -%]
 [% IF element.PhysicalAddress.Country -%]
-<Country>[% element.PhysicalAddress.Country | xml %]</Country>
+<ncip:Country>[% element.PhysicalAddress.Country | xml %]</ncip:Country>
 [% END -%]
-</StructuredAddress>
-</PhysicalAddress>
+[% IF element.PhysicalAddress.PostalCode -%]
+<ncip:PostalCode>[% element.PhysicalAddress.PostalCode | xml %]</ncip:PostalCode>
+[% END -%]
+</ncip:StructuredAddress>
+<ncip:PhysicalAddressType>Postal Address</ncip:PhysicalAddressType>
+</ncip:PhysicalAddress>
 [% ELSIF element.ElectronicAddress -%]
-<ElectronicAddress>
-<ElectronicAddressType>[% element.ElectronicAddress.Type | xml %]</ElectronicAddressType>
-<ElectronicAddressData>[% element.ElectronicAddress.Data | xml %]</ElectronicAddressData>
-</ElectronicAddress>
+<ncip:ElectronicAddress>
+<ncip:ElectronicAddressType>[% element.ElectronicAddress.Type | xml %]</ncip:ElectronicAddressType>
+<ncip:ElectronicAddressData>[% element.ElectronicAddress.Data | xml %]</ncip:ElectronicAddressData>
+</ncip:ElectronicAddress>
 [% END -%]
-</UserAddressInformation>
+</ncip:UserAddressInformation>
 [% END -%]
 [% END -%]
 [% IF data.UserOptionalFields.UserPrivilege -%]
 [% FOREACH privilege IN data.UserOptionalFields.UserPrivilege -%]
-<UserPrivilege>
-<AgencyId>[% privilege.AgencyId | xml -%]</AgencyId>
-<AgencyUserPrivilegeType>[% privilege.AgencyUserPrivilegeType | xml %]</AgencyUserPrivilegeType>
+<ncip:UserPrivilege>
+<ncip:AgencyId>[% privilege.AgencyId | xml -%]</ncip:AgencyId>
+<ncip:AgencyUserPrivilegeType>[% privilege.AgencyUserPrivilegeType | xml %]</ncip:AgencyUserPrivilegeType>
 [% IF privilege.ValidFromDate -%]
-<ValidFromDate>[% privilege.ValidFromDate | xml %]</ValidFromDate>
+<ncip:ValidFromDate>[% privilege.ValidFromDate | xml %]</ncip:ValidFromDate>
 [% END -%]
 [% IF privilege.ValidToDate -%]
-<ValidToDate>[% privilege.ValidToDate | xml %]</ValidToDate>
+<ncip:ValidToDate>[% privilege.ValidToDate | xml %]</ncip:ValidToDate>
 [% END -%]
 [% IF privilege.UserPrivilegeDescription -%]
-<UserPrivilegeDescription>[% privilege.UserPrivilegeDescription | xml %]</UserPrivilegeDescription>
+<ncip:UserPrivilegeDescription>[% privilege.UserPrivilegeDescription | xml %]</ncip:UserPrivilegeDescription>
 [% END -%]
 [% IF privilege.UserPrivilegeStatus -%]
-<UserPrivilegeStatus>
-<UserPrivilegeStatusType>
+<ncip:UserPrivilegeStatus>
+<ncip:UserPrivilegeStatusType>
 [% privilege.UserPrivilegeStatus.UserPrivilegeStatusType | xml %]
-</UserPrivilegeStatusType>
+</ncip:UserPrivilegeStatusType>
 [% IF privilege.UserPrivilegeStatus.DateOfUserPrivilegeStatus -%]
-<DateOfUserPrivilegeStatus>
+<ncip:DateOfUserPrivilegeStatus>
 [% privilege.UserPrivilegeStatus.DateOfUserPrivilegeStatus | xml %]
-</DateOfUserPrivilegeStatus>
+</ncip:DateOfUserPrivilegeStatus>
 [% END -%]
-</UserPrivilegeStatus>
+</ncip:UserPrivilegeStatus>
 [% END -%]
-</UserPrivilege>
+</ncip:UserPrivilege>
 [% END -%]
 [% END -%]
 [% IF data.UserOptionalFields.UserLanguage -%]
 [% FOREACH language IN data.UserOptionalFields.UserLanguage -%]
-<UserLanguage>[% language | xml %]</UserLanguage>
+<ncip:UserLanguage>[% language | xml %]</ncip:UserLanguage>
 [% END -%]
 [% END -%]
 [% IF data.UserOptionalFields.BlockOrTrap -%]
 [% FOREACH block IN data.UserOptionalFields.BlockOrTrap -%]
-<BlockOrTrap>
-<AgencyId>[% block.AgencyId | xml %]</AgencyId>
-<BlockOrTrapType>[% block.BlockOrTrapType | xml %]</BlockOrTrapType>
+<ncip:BlockOrTrap>
+<ncip:AgencyId>[% block.AgencyId | xml %]</ncip:AgencyId>
+<ncip:BlockOrTrapType>[% block.BlockOrTrapType | xml %]</ncip:BlockOrTrapType>
 [% IF block.ValidFromDate -%]
-<ValidFromDate>[% block.ValidFromDate %]</ValidFromDate>
+<ncip:ValidFromDate>[% block.ValidFromDate %]</ncip:ValidFromDate>
 [% END -%]
 [% IF block.ValidToDate -%]
-<ValidToDate>[% block.ValidToDate %]</ValidToDate>
+<ncip:ValidToDate>[% block.ValidToDate %]</ncip:ValidToDate>
 [% END %]
-</BlockOrTrap>
+</ncip:BlockOrTrap>
 [% END -%]
 [% END -%]
-</UserOptionalFields>
+</ncip:UserOptionalFields>
 [% END -%]

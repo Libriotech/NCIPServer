@@ -1,91 +1,91 @@
 [% IF data.ItemOptionalFields -%]
-<ItemOptionalFields>
+<ncip:ItemOptionalFields>
 [% IF data.ItemOptionalFields.BibliographicDescription -%]
-<BibliographicDescription>
+<ncip:BibliographicDescription>
 [% IF data.ItemOptionalFields.BibliographicDescription.Author -%]
-<Author>
+<ncip:Author>
 [% data.ItemOptionalFields.BibliographicDescription.Author | xml %]
-</Author>
+</ncip:Author>
 [% END -%]
 [% IF data.ItemOptionalFields.BibliographicDescription.Title -%]
-<Title>
+<ncip:Title>
 [% data.ItemOptionalFields.BibliographicDescription.Title | xml %]
-</Title>
+</ncip:Title>
 [% END -%]
 [% IF data.ItemOptionalFields.BibliographicDescription.Publisher -%]
-<Publisher>
+<ncip:Publisher>
 [% data.ItemOptionalFields.BibliographicDescription.Publisher | xml %]
-</Publisher>
+</ncip:Publisher>
 [% END -%]
 [% IF data.ItemOptionalFields.BibliographicDescription.PublicationDate -%]
-<PublicationDate>
+<ncip:PublicationDate>
 [% data.ItemOptionalFields.BibliographicDescription.PublicationDate | xml %]
-</PublicationDate>
+</ncip:PublicationDate>
 [% END -%]
 [% IF data.ItemOptionalFields.BibliographicDescription.Edition -%]
-<Edition>
+<ncip:Edition>
 [% data.ItemOptionalFields.BibliographicDescription.Edition | xml %]
-</Edition>
+</ncip:Edition>
 [% END -%]
 [% IF data.ItemOptionalFields.BibliographicDescription.BibliographicRecordId;
       id = data.ItemOptionalFields.BibliographicDescription.BibliographicRecordId -%]
-<BibliographicRecordId>
-<BibliographicRecordIdentifier>
+<ncip:BibliographicRecordId>
+<ncip:BibliographicRecordIdentifier>
 [% id.BibliographicRecordIdentifier | xml %]
-</BibliographicRecordIdentifer>
+</ncip:BibliographicRecordIdentifer>
 [% IF id.BibliographicRecordIdentifierCode -%]
-<BibliographicRecordIdentifierCode>
+<ncip:BibliographicRecordIdentifierCode>
 [% id.BibliographicRecordIdentifierCode | xml %]
-</BibliographicRecordIdentifierCode>
+</ncip:BibliographicRecordIdentifierCode>
 [% END -%]
 [% IF id.AgencyId -%]
-<AgencyId>
+<ncip:AgencyId>
 [% id.AgencyId | xml %]
-</AgencyId>
+</ncip:AgencyId>
 [% END -%]
-</BibliographicRecordId>
+</ncip:BibliographicRecordId>
 [% END -%]
 [% IF data.ItemOptionalFields.BibliographicDescription.BibliographicItemId;
       id = data.ItemOptionalFields.BibliographicDescription.BibliographicItemId -%]
-<BibliographicItemId>
-<BibliographicItemIdentifier>
+<ncip:BibliographicItemId>
+<ncip:BibliographicItemIdentifier>
 [% id.BibliographicItemIdentifier | xml %]
-</BibliographicItemIdentifier>
+</ncip:BibliographicItemIdentifier>
 [% IF id.BibliographicItemIdentifierCode -%]
-<BibliographicItemIdentifierCode>
+<ncip:BibliographicItemIdentifierCode>
 [% id.BibliographicItemIdentifierCode | xml %]
-</BibliographicItemIdentifierCode>
+</ncip:BibliographicItemIdentifierCode>
 [% END -%]
-</BibliographicItemId>
+</ncip:BibliographicItemId>
 [% END -%]
-</BibliographicDescription>
+</ncip:BibliographicDescription>
 [% END -%]
 [% IF data.ItemOptionalFields.ItemDescription -%]
-<ItemDescription>
-<CallNumber>
+<ncip:ItemDescription>
+<ncip:CallNumber>
 [% data.ItemOptionalFields.ItemDescription.CallNumber | xml %]
-</CallNumber>
-</ItemDescription>
+</ncip:CallNumber>
+</ncip:ItemDescription>
 [% END -%]
 [% IF data.ItemOptionalFields.CirculationStatus -%]
-<CirculationStatus>
+<ncip:CirculationStatus>
 [% data.ItemOptionalFields.CirculationStatus | xml %]
-</CirculationStatus>
+</ncip:CirculationStatus>
 [% END -%]
 [% IF data.ItemOptionalFields.DateDue -%]
-<DateDue>
+<ncip:DateDue>
 [% data.ItemOptionalFields.DateDue | xml %]
-</DateDue>
+</ncip:DateDue>
 [% END -%]
 [% IF data.ItemOptionalFields.ItemUseRestrictionType -%]
-<ItemUseRestrictionType>
+<ncip:ItemUseRestrictionType>
 [% data.ItemOptionalFields.ItemUseRestrictionType | xml %]
-</ItemUseRestrictionType>
+</ncip:ItemUseRestrictionType>
 [% END -%]
 [% IF data.ItemOptionalFields.PhysicalCondition -%]
-<PhysicalCondition>
+<ncip:PhysicalCondition>
 [% data.ItemOptionalFields.PhysicalCondition | xml %]
-</PhysicalCondition>
+</ncip:PhysicalCondition>
 [% END -%]
-</ItemOptionalFields>
+</ncip:ItemOptionalFields>
 [% END -%]
