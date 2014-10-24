@@ -1,12 +1,12 @@
-<ncip:ResponseHeader>
-<ncip:FromAgencyId>
-<ncip:AgencyId>
+<ResponseHeader>
+<FromAgencyId>
+<AgencyId>
 [% header.FromAgencyId.AgencyId | xml %]
-</ncip:AgencyId>
-</ncip:FromAgencyId>
-<ncip:ToAgencyId>
-<ncip:AgencyId>
+</AgencyId>
+</FromAgencyId>
+<ToAgencyId>
+<AgencyId>
 [% header.ToAgencyId.AgencyId  | xml %]
-</ncip:AgencyId>
-</ncip:ToAgencyId>
-</ncip:ResponseHeader>
+</AgencyId>
+</ToAgencyId>
+</ResponseHeader>

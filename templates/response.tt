@@ -1,4 +1,4 @@
-<ncip:[% type %]>
+<[% type %]>
 [% IF header;
       INCLUDE "includes/ResponseHeader.inc";
    END;
@@ -8,4 +8,4 @@
       INCLUDE "includes/problem.inc";
    END;
 -%]
-</ncip:[% type %]>
+</[% type %]>

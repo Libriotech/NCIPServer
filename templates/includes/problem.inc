@@ -1,18 +1,18 @@
-<ncip:Problem>
+<Problem>
 [% IF problem.Scheme -%]
-<ncip:ProblemType Scheme="[% problem.Scheme | xml %]">
+<ProblemType Scheme="[% problem.Scheme | xml %]">
 [% ELSE -%]
-<ncip:ProblemType>
+<ProblemType>
 [% END -%]
 [% problem.ProblemType | xml %]
-</ncip:ProblemType>
-<ncip:ProblemDetail>
+</ProblemType>
+<ProblemDetail>
 [% problem.ProblemDetail | xml %]
-</ncip:ProblemDetail>
-<ncip:ProblemElement>
+</ProblemDetail>
+<ProblemElement>
 [% problem.ProblemElement | xml %]
-</ncip:ProblemElement>
-<ncip:ProblemValue>
+</ProblemElement>
+<ProblemValue>
 [% problem.ProblemValue | xml %]
-</ncip:ProblemValue>
-</ncip:Problem>
+</ProblemValue>
+</Problem>
