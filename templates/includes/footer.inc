@@ -1,1 +1,1 @@
-</NCIPMessage>
+</ncip:NCIPMessage>

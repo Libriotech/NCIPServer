@@ -1,4 +1,4 @@
 [% INCLUDE "includes/CheckInItemResponse.inc" %]
 [% IF data.DateDue -%]
-<DateDue>[% data.DateDue | xml %]</DateDue>
+<ncip:DateDue>[% data.DateDue | xml %]</ncip:DateDue>
 [% END -%]

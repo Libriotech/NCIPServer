@@ -674,9 +674,7 @@ sub renewitem {
         # circ information to get the new due date.
         $details = $self->retrieve_copy_details_by_barcode($item_barcode);
         $circ = $details->{circ};
-        my $due = DateTime::Format::ISO8601->parse_datetime(cleanse_ISO8601($circ->due_date()));
-        $due->set_time_zone('UTC');
-        $data->{DateDue} = $due->iso8601();
+        $data->{DateDue} = _fix_date($circ->due_date());
 
         # Look for UserElements requested and add it to the response:
         my $elements = $request->{$message}->{UserElementType};
@@ -847,9 +845,7 @@ sub checkoutitem {
         # circ information to get the due date.
         $details = $self->retrieve_copy_details_by_barcode($item_barcode);
         $circ = $details->{circ};
-        my $due = DateTime::Format::ISO8601->parse_datetime(cleanse_ISO8601($circ->due_date()));
-        $due->set_time_zone('UTC');
-        $data->{DateDue} = $due->iso8601();
+        $data->{DateDue} = _fix_date($circ->due_date());
 
         # Look for UserElements requested and add it to the response:
         my $elements = $request->{$message}->{UserElementType};
@@ -1363,8 +1359,8 @@ sub handle_user_elements {
             my $privilege = NCIP::User::Privilege->new();
             $privilege->AgencyId($user->home_ou->shortname());
             $privilege->AgencyUserPrivilegeType($pgt->name());
-            $privilege->ValidToDate($user->expire_date());
-            $privilege->ValidFromDate($user->create_date());
+            $privilege->ValidToDate(_fix_date($user->expire_date()));
+            $privilege->ValidFromDate(_fix_date($user->create_date()));
 
             my $status = 'Active';
             if (_expired($user)) {
@@ -1528,9 +1524,7 @@ sub handle_item_elements {
         $details = $self->retrieve_copy_details_by_barcode($copy->barcode()) unless($details);
         if ($details->{circ}) {
             if (!$details->{circ}->checkin_time()) {
-                my $due = DateTime::Format::ISO8601->parse_datetime(cleanse_ISO8601($details->{circ}->due_date()));
-                $due->set_time_zone('UTC');
-                $optionalfields->DateDue($due->iso8601());
+                $optionalfields->DateDue(_fix_date($details->{circ}->due_date()));
             }
         }
     }
@@ -2979,6 +2973,14 @@ sub _problem_from_event {
             ProblemValue => ($value) ? $value : 'NULL'
         }
     );
+}
+
+# "Fix" dates for output so they validate against the schema
+sub _fix_date {
+    my $date = shift;
+    my $out = DateTime::Format::ISO8601->parse_datetime(cleanse_ISO8601($date));
+    $out->set_time_zone('UTC');
+    return $out->iso8601();
 }
 
 1;
