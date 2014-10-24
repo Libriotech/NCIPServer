@@ -1,15 +1,15 @@
-<ncip:FromAgencyId>
-<ncip:AgencyId>
+<FromAgencyId>
+<AgencyId>
 [%- data.fromagencyid -%]
-</ncip:AgencyId>
-</ncip:FromAgencyId>
-<ncip:ToAgencyId>
-<ncip:AgencyId>
+</AgencyId>
+</FromAgencyId>
+<ToAgencyId>
+<AgencyId>
 [%- data.toagencyid -%]
-</ncip:AgencyId>
-</ncip:ToAgencyId>
+</AgencyId>
+</ToAgencyId>
 [% FOREACH version IN data.versions -%]
-<ncip:VersionSupported>
+<VersionSupported>
 [%- version | xml -%]
-</ncip:VersionSupported>
+</VersionSupported>
 [% END -%]

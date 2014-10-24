@@ -1,22 +1,22 @@
-<ncip:ItemId>
+<ItemId>
 [% IF data.ItemId.AgencyId -%]
-<ncip:AgencyId>[% data.ItemId.AgencyId | xml %]</ncip:AgencyId>
+<AgencyId>[% data.ItemId.AgencyId | xml %]</AgencyId>
 [% END -%]
 [% IF data.ItemId.ItemIdentifierType -%]
-<ncip:ItemIdentifierType>[% data.ItemId.ItemIdentifierType | xml %]</ncip:ItemIdentifierType>
+<ItemIdentifierType>[% data.ItemId.ItemIdentifierType | xml %]</ItemIdentifierType>
 [% END -%]
-<ncip:ItemIdentifierValue>[% data.ItemId.ItemIdentifierValue | xml %]</ncip:ItemIdentifierValue>
-</ncip:ItemId>
+<ItemIdentifierValue>[% data.ItemId.ItemIdentifierValue | xml %]</ItemIdentifierValue>
+</ItemId>
 [% IF data.UserId -%]
-<ncip:UserId>
+<UserId>
 [% IF data.UserId.AgencyId -%]
-<ncip:AgencyId>[% data.UserId.AgencyId | xml %]</ncip:AgencyId>
+<AgencyId>[% data.UserId.AgencyId | xml %]</AgencyId>
 [% END -%]
 [% IF data.UserId.UserIdentifierType -%]
-<ncip:UserIdentifierType>[% data.UserId.UserIdentifierType | xml %]</ncip:UserIdentifierType>
+<UserIdentifierType>[% data.UserId.UserIdentifierType | xml %]</UserIdentifierType>
 [% END -%]
-<ncip:UserIdentifierValue>[% data.UserId.UserIdentifierValue | xml %]</ncip:UserIdentifierValue>
-</ncip:UserId>
+<UserIdentifierValue>[% data.UserId.UserIdentifierValue | xml %]</UserIdentifierValue>
+</UserId>
 [% END -%]
 [% INCLUDE "includes/UserOptionalFields.inc" -%]
 [% INCLUDE "includes/ItemOptionalFields.inc" -%]
