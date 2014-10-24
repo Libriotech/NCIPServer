@@ -1,8 +1,5 @@
 [% FOREACH id IN data.UserId -%]
 <ncip:UserId>
-<ncip:UserIdentifierValue>
-[% id.UserIdentifierValue | xml %]
-</ncip:UserIdentifierValue>
 [% IF id.UserIdentifierType -%]
 <ncip:UserIdentifierType>
 [% id.UserIdentifierType | xml %]
@@ -13,6 +10,9 @@
 [% id.AgencyId %]
 </ncip:AgencyId>
 [% END -%]
+<ncip:UserIdentifierValue>
+[% id.UserIdentifierValue | xml %]
+</ncip:UserIdentifierValue>
 </ncip:UserId>
 [% END -%]
 [% INCLUDE "includes/UserOptionalFields.inc" -%]
