@@ -1361,7 +1361,7 @@ sub handle_user_elements {
                     }
                 )
             );
-            push @$adresses, $address;
+            push @$addresses, $address;
         }
         if ($user->evening_phone()) {
             my $address = NCIP::User::AddressInformation->new({UserAddressRoleType=>'Evening Phone'});
@@ -1373,7 +1373,7 @@ sub handle_user_elements {
                     }
                 )
             );
-            push @$adresses, $address;
+            push @$addresses, $address;
         }
         if ($user->other_phone()) {
             my $address = NCIP::User::AddressInformation->new({UserAddressRoleType=>'Other Phone'});
@@ -1385,7 +1385,7 @@ sub handle_user_elements {
                     }
                 )
             );
-            push @$adresses, $address;
+            push @$addresses, $address;
         }
 
         $optionalfields->UserAddressInformation($addresses);
