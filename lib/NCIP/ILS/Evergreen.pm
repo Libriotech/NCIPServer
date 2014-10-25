@@ -1339,16 +1339,53 @@ sub handle_user_elements {
         }
 
         # Right now, we're only sharing email address if the user
-        # has it. We don't share phone numbers.
+        # has it.
         if ($user->email()) {
             my $address = NCIP::User::AddressInformation->new({UserAddressRoleType=>'Email Address'});
             $address->ElectronicAddress(
                 NCIP::ElectronicAddress->new({
-                    Type=>'Email Address',
+                    Type=>'mailto',
                     Data=>$user->email()
                 })
                 );
             push @$addresses, $address;
+        }
+        # Auto-graphics asked for the phone numbers.
+        if ($user->day_phone()) {
+            my $address = NCIP::User::AddressInformation->new({UserAddressRoleType=>'Day Phone'});
+            $address->ElectronicAddress(
+                NCIP::ElectronicAddress->new(
+                    {
+                        Type=>'Day Phone',
+                        Data=>$user->day_phone()
+                    }
+                )
+            );
+            push @$adresses, $address;
+        }
+        if ($user->evening_phone()) {
+            my $address = NCIP::User::AddressInformation->new({UserAddressRoleType=>'Evening Phone'});
+            $address->ElectronicAddress(
+                NCIP::ElectronicAddress->new(
+                    {
+                        Type=>'Evening Phone',
+                        Data=>$user->evening_phone()
+                    }
+                )
+            );
+            push @$adresses, $address;
+        }
+        if ($user->other_phone()) {
+            my $address = NCIP::User::AddressInformation->new({UserAddressRoleType=>'Other Phone'});
+            $address->ElectronicAddress(
+                NCIP::ElectronicAddress->new(
+                    {
+                        Type=>'Other Phone',
+                        Data=>$user->other_phone()
+                    }
+                )
+            );
+            push @$adresses, $address;
         }
 
         $optionalfields->UserAddressInformation($addresses);
