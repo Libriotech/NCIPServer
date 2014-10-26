@@ -6,6 +6,7 @@ our $VERSION = '0.1';
 use NCIP;
 
 any [ 'get', 'post' ] => '/' => sub {
+    content_type 'application/xml';
     my $ncip = NCIP->new('t/config_sample');
     my $xml  = param 'xml';
     if ( request->is_post ) {
