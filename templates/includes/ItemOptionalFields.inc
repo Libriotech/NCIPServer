@@ -30,31 +30,21 @@
 [% IF data.ItemOptionalFields.BibliographicDescription.BibliographicRecordId;
       id = data.ItemOptionalFields.BibliographicDescription.BibliographicRecordId -%]
 <BibliographicRecordId>
-<BibliographicRecordIdentifier>
-[% id.BibliographicRecordIdentifier | xml %]
-</BibliographicRecordIdentifer>
+<BibliographicRecordIdentifier>[% id.BibliographicRecordIdentifier | xml %]</BibliographicRecordIdentifer>
 [% IF id.BibliographicRecordIdentifierCode -%]
-<BibliographicRecordIdentifierCode>
-[% id.BibliographicRecordIdentifierCode | xml %]
-</BibliographicRecordIdentifierCode>
+<BibliographicRecordIdentifierCode>[% id.BibliographicRecordIdentifierCode | xml %]</BibliographicRecordIdentifierCode>
 [% END -%]
 [% IF id.AgencyId -%]
-<AgencyId>
-[% id.AgencyId | xml %]
-</AgencyId>
+<AgencyId>[% id.AgencyId | xml %]</AgencyId>
 [% END -%]
 </BibliographicRecordId>
 [% END -%]
 [% IF data.ItemOptionalFields.BibliographicDescription.BibliographicItemId;
       id = data.ItemOptionalFields.BibliographicDescription.BibliographicItemId -%]
 <BibliographicItemId>
-<BibliographicItemIdentifier>
-[% id.BibliographicItemIdentifier | xml %]
-</BibliographicItemIdentifier>
+<BibliographicItemIdentifier>[% id.BibliographicItemIdentifier | xml %]</BibliographicItemIdentifier>
 [% IF id.BibliographicItemIdentifierCode -%]
-<BibliographicItemIdentifierCode>
-[% id.BibliographicItemIdentifierCode | xml %]
-</BibliographicItemIdentifierCode>
+<BibliographicItemIdentifierCode>[% id.BibliographicItemIdentifierCode | xml %]</BibliographicItemIdentifierCode>
 [% END -%]
 </BibliographicItemId>
 [% END -%]
@@ -62,30 +52,20 @@
 [% END -%]
 [% IF data.ItemOptionalFields.ItemDescription -%]
 <ItemDescription>
-<CallNumber>
-[% data.ItemOptionalFields.ItemDescription.CallNumber | xml %]
-</CallNumber>
+<CallNumber>[% data.ItemOptionalFields.ItemDescription.CallNumber | xml %]</CallNumber>
 </ItemDescription>
 [% END -%]
 [% IF data.ItemOptionalFields.CirculationStatus -%]
-<CirculationStatus>
-[% data.ItemOptionalFields.CirculationStatus | xml %]
-</CirculationStatus>
+<CirculationStatus>[% data.ItemOptionalFields.CirculationStatus | xml %]</CirculationStatus>
 [% END -%]
 [% IF data.ItemOptionalFields.DateDue -%]
-<DateDue>
-[% data.ItemOptionalFields.DateDue | xml %]
-</DateDue>
+<DateDue>[% data.ItemOptionalFields.DateDue | xml %]</DateDue>
 [% END -%]
 [% IF data.ItemOptionalFields.ItemUseRestrictionType -%]
-<ItemUseRestrictionType>
-[% data.ItemOptionalFields.ItemUseRestrictionType | xml %]
-</ItemUseRestrictionType>
+<ItemUseRestrictionType>[% data.ItemOptionalFields.ItemUseRestrictionType | xml %]</ItemUseRestrictionType>
 [% END -%]
 [% IF data.ItemOptionalFields.PhysicalCondition -%]
-<PhysicalCondition>
-[% data.ItemOptionalFields.PhysicalCondition | xml %]
-</PhysicalCondition>
+<PhysicalCondition>[% data.ItemOptionalFields.PhysicalCondition | xml %]</PhysicalCondition>
 [% END -%]
 </ItemOptionalFields>
 [% END -%]
