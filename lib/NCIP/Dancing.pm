@@ -5,9 +5,11 @@ our $VERSION = '0.1';
 
 use NCIP;
 
+my $conf_dir = $ENV{'NCIP_CONFIG_DIR'} || 't/config_sample';
+
 any [ 'get', 'post' ] => '/' => sub {
     content_type 'application/xml';
-    my $ncip = NCIP->new('t/config_sample');
+    my $ncip = NCIP->new($conf_dir);
     my $xml  = param 'xml';
     if ( request->is_post ) {
         $xml = request->body;
