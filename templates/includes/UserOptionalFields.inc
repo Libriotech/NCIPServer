@@ -72,13 +72,9 @@
 [% END -%]
 [% IF privilege.UserPrivilegeStatus -%]
 <UserPrivilegeStatus>
-<UserPrivilegeStatusType>
-[% privilege.UserPrivilegeStatus.UserPrivilegeStatusType | xml %]
-</UserPrivilegeStatusType>
+<UserPrivilegeStatusType>[% privilege.UserPrivilegeStatus.UserPrivilegeStatusType | xml %]</UserPrivilegeStatusType>
 [% IF privilege.UserPrivilegeStatus.DateOfUserPrivilegeStatus -%]
-<DateOfUserPrivilegeStatus>
-[% privilege.UserPrivilegeStatus.DateOfUserPrivilegeStatus | xml %]
-</DateOfUserPrivilegeStatus>
+<DateOfUserPrivilegeStatus>[% privilege.UserPrivilegeStatus.DateOfUserPrivilegeStatus | xml %]</DateOfUserPrivilegeStatus>
 [% END -%]
 </UserPrivilegeStatus>
 [% END -%]
