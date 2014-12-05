@@ -271,8 +271,8 @@ sub acceptitem {
         my $item_info = {
             barcode => $item_barcode,
             call_number => $request->{$message}->{ItemOptionalFields}->{ItemDescription}->{CallNumber},
-            title => $request->{$message}->{ItemOptionalFields}->{BibliographicDescription}->{Author},
-            author => $request->{$message}->{ItemOptionalFields}->{BibliographicDescription}->{Title},
+            title => $request->{$message}->{ItemOptionalFields}->{BibliographicDescription}->{Title},
+            author => $request->{$message}->{ItemOptionalFields}->{BibliographicDescription}->{Author},
             publisher => $request->{$message}->{ItemOptionalFields}->{BibliographicDescription}->{Publisher},
             publication_date => $request->{$message}->{ItemOptionalFields}->{BibliographicDescription}->{PublicationDate},
             medium => $request->{$message}->{ItemOptionalFields}->{BibliographicDescription}->{MediumType},
