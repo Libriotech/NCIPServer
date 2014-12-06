@@ -303,10 +303,7 @@ sub acceptitem {
         # We try to find the pickup location in our database. It's OK
         # if it does not exist, the user's home library will be used
         # instead.
-        my $location = $request->{$message}->{PickupLocation};
-        if ($location) {
-            $location = $self->retrieve_org_unit_by_shortname($location);
-        }
+        my $location = $self->find_location_failover($request->{$message}->{PickupLocation}, $request, $message);
 
         # Now, we place the hold on the newly created copy on behalf
         # of the patron retrieved above.
@@ -985,6 +982,16 @@ sub requestitem {
         return $response;
     }
 
+    # We have an item.  If we have a biblio.record_entry object,
+    # Auto-Graphics expects us to place the hold such that it is
+    # limited to the branch or system whose id they have given us.
+    # We, therefore, look for an org_unit based on the ToAgencyId from
+    # the InitiationHeader.
+    my $ou;
+    if (ref($item) eq 'Fieldmapper::biblio::record_entry') {
+        $ou = $self->find_location_failover(undef, $request, $message);
+    }
+
     # See if we were given a PickupLocation.
     my $location;
     if ($request->{$message}->{PickupLocation}) {
@@ -998,7 +1005,7 @@ sub requestitem {
     my $hold_expiration = $request->{$message}->{NeedBeforeDate};
 
     # Place the hold.
-    my $hold = $self->place_hold($item, $user, $location, $hold_expiration);
+    my $hold = $self->place_hold($item, $user, $location, $hold_expiration, $ou);
     if (ref($hold) eq 'NCIP::Problem') {
         $response->problem($hold);
     } else {
@@ -1978,8 +1985,9 @@ sub retrieve_copy_status {
 
     $org_unit = $ils->retrieve_org_unit_by_shortname($shortname);
 
-Retrieves an org. unit from the database by shortname. Returns the
-org. unit as a Fieldmapper object or undefined.
+Retrieves an org. unit from the database by shortname, and fleshes the
+ou_type field. Returns the org. unit as a Fieldmapper object or
+undefined.
 
 =cut
 
@@ -1992,6 +2000,17 @@ sub retrieve_org_unit_by_shortname {
         'open-ils.actor.org_unit.retrieve_by_shortname',
         $shortname
     );
+
+    # We want to retrieve the type and manually "flesh" the object.
+    if ($aou) {
+        my $type = $U->simplereq(
+            'open-ils.pcrud',
+            'open-ils.pcrud.retrieve.aou',
+            $self->{session}->{authtoken},
+            $aou->ou_type()
+        );
+        $aou->ou_type($type) if ($type);
+    }
 
     return $aou;
 }
@@ -2318,7 +2337,7 @@ sub create_fuller_copy {
 
 =head2 place_hold
 
-    $hold = $ils->place_hold($item, $user, $location, $expiration);
+    $hold = $ils->place_hold($item, $user, $location, $expiration, $org_unit);
 
 This function places a hold on $item for $user for pickup at
 $location. If location is not provided or undefined, the user's home
@@ -2327,6 +2346,14 @@ library is used as a fallback.
 The $expiration argument is optional and must be a properly formatted
 ISO date time. It will be used as the hold expire time, if
 provided. Otherwise the system default time will be used.
+
+The $org_unit parameter is only consulted in the event of $item being
+a biblio::record_entry object.  In which case, it is expected to be
+undefined or an actor::org_unit object.  If it is present, then its id
+and ou_type depth (if the ou_type field is fleshed) will be used to
+control the selection ou and selection depth for the hold.  This
+essentially limits the hold to being filled by copies belonging to the
+specified org_unit or its children.
 
 $item can be a copy (asset::copy), volume (asset::call_number), or bib
 (biblio::record_entry). The appropriate hold type will be placed
@@ -2343,6 +2370,7 @@ sub place_hold {
     my $user = shift;
     my $location = shift;
     my $expiration = shift;
+    my $org_unit = shift;
 
     # If $location is undefined, use the user's home_ou, which should
     # have been fleshed when the user was retrieved.
@@ -2382,6 +2410,10 @@ sub place_hold {
         $hold->hold_type('T');
         $params->{hold_type} = 'T';
         $params->{titleid} = $item->id();
+        if ($org_unit && ref($org_unit) eq 'Fieldmapper::actor::org_unit') {
+            $hold->selection_ou($org_unit->id());
+            $hold->selection_depth($org_unit->ou_type->depth()) if (ref($org_unit->ou_type()));
+        }
     }
 
     # Check for a duplicate hold:
@@ -2668,7 +2700,7 @@ sub find_target_via_bibliographic_id {
             $bibid = $idobj->{BibliographicRecordIdentifier};
             my $locname = $idobj->{AgencyId};
             if ($locname) {
-                $locname =~ s/.*://;
+                $locname =~ s/^.*://;
                 $loc = $self->retrieve_org_unit_by_shortname($locname);
             }
         } elsif ($idobj->{BibliographicRecordIdentifierCode}) {
@@ -2726,6 +2758,41 @@ sub find_target_via_bibliographic_id {
     }
 
     return $item;
+}
+
+=head2 find_location_failover
+
+    $location = $ils->find_location_failover($location, $request, $message);
+
+Attempts to retrieve an org_unit by shortname from the passed in
+$location.  If that fails, $request and $message are used to lookup
+the ToAgencyId/AgencyId field and that is used.  Returns an org_unit
+as retrieved by retrieve_org_unit_by_shortname if successful and undef
+on failure.
+
+=cut
+
+sub find_location_failover {
+    my ($self, $location, $request, $message) = @_;
+    if ($request && !$message) {
+        $message = $self->parse_request_type($request);
+    }
+    my $org_unit;
+    if ($location) {
+        # Because Auto-Graphics. (This should be configured somehow.)
+        $location =~ s/^[^-]+-//;
+        $org_unit = $self->retrieve_org_unit_by_shortname($location);
+    }
+    if ($request && $message && !$org_unit) {
+        $location = $request->{$message}->{InitiationHeader}->{ToAgencyId}->{AgencyId};
+        if ($location) {
+            # Because Auto-Graphics. (This should be configured somehow.)
+            $location = ~ s/^[^-]+-//;
+            $org_unit = $self->retrieve_org_unit_by_shortname($location);
+        }
+    }
+
+    return $org_unit;
 }
 
 # private subroutines not meant to be used directly by subclasses.
