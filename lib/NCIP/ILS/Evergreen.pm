@@ -2787,7 +2787,7 @@ sub find_location_failover {
         $location = $request->{$message}->{InitiationHeader}->{ToAgencyId}->{AgencyId};
         if ($location) {
             # Because Auto-Graphics. (This should be configured somehow.)
-            $location = ~ s/^[^-]+-//;
+            $location =~ s/^[^-]+-//;
             $org_unit = $self->retrieve_org_unit_by_shortname($location);
         }
     }
