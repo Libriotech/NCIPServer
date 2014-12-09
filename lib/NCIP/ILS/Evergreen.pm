@@ -2704,9 +2704,9 @@ sub find_target_via_bibliographic_id {
                 $loc = $self->retrieve_org_unit_by_shortname($locname);
             }
         } elsif ($idobj->{BibliographicRecordIdentifierCode}) {
-            $bibid = $idobj->{BibliographicRecordIdentifierCode}
+            $bibid = $idobj->{BibliographicRecordIdentifier};
         } else {
-            $bibid = $idobj->{BibliographicItemIdentifierCode}
+            $bibid = $idobj->{BibliographicItemIdentifier};
         }
         if ($bibid && $loc) {
             $item = $self->_call_number_search($bibid, $loc);
