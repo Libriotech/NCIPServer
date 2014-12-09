@@ -2005,7 +2005,7 @@ sub retrieve_org_unit_by_shortname {
     if ($aou) {
         my $type = $U->simplereq(
             'open-ils.pcrud',
-            'open-ils.pcrud.retrieve.aou',
+            'open-ils.pcrud.retrieve.aout',
             $self->{session}->{authtoken},
             $aou->ou_type()
         );
