@@ -1012,8 +1012,9 @@ sub requestitem {
         my $data = {
             RequestId => NCIP::RequestId->new(
                 {
-                    RequestIdentifierType => 'SYSNUMBER',
-                    RequestIdentifierValue => $hold->id()
+                    AgencyId => $request->{$message}->{RequestId}->{AgencyId},
+                    RequestIdentifierType => $request->{$message}->{RequestId}->{RequestIdentifierType},
+                    RequestIdentifierValue => $request->{$message}->{RequestId}->{RequestIdentifierValue}
                 }
             ),
             UserId => NCIP::User::Id->new(
