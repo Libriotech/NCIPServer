@@ -3,29 +3,19 @@
 [% IF data.ItemOptionalFields.BibliographicDescription -%]
 <BibliographicDescription>
 [% IF data.ItemOptionalFields.BibliographicDescription.Author -%]
-<Author>
-[% data.ItemOptionalFields.BibliographicDescription.Author | xml %]
-</Author>
+<Author>[% data.ItemOptionalFields.BibliographicDescription.Author | xml %]</Author>
 [% END -%]
 [% IF data.ItemOptionalFields.BibliographicDescription.Title -%]
-<Title>
-[% data.ItemOptionalFields.BibliographicDescription.Title | xml %]
-</Title>
+<Title>[% data.ItemOptionalFields.BibliographicDescription.Title | xml %]</Title>
 [% END -%]
 [% IF data.ItemOptionalFields.BibliographicDescription.Publisher -%]
-<Publisher>
-[% data.ItemOptionalFields.BibliographicDescription.Publisher | xml %]
-</Publisher>
+<Publisher>[% data.ItemOptionalFields.BibliographicDescription.Publisher | xml %]</Publisher>
 [% END -%]
 [% IF data.ItemOptionalFields.BibliographicDescription.PublicationDate -%]
-<PublicationDate>
-[% data.ItemOptionalFields.BibliographicDescription.PublicationDate | xml %]
-</PublicationDate>
+<PublicationDate>[% data.ItemOptionalFields.BibliographicDescription.PublicationDate | xml %]</PublicationDate>
 [% END -%]
 [% IF data.ItemOptionalFields.BibliographicDescription.Edition -%]
-<Edition>
-[% data.ItemOptionalFields.BibliographicDescription.Edition | xml %]
-</Edition>
+<Edition>[% data.ItemOptionalFields.BibliographicDescription.Edition | xml %]</Edition>
 [% END -%]
 [% IF data.ItemOptionalFields.BibliographicDescription.BibliographicRecordId;
       id = data.ItemOptionalFields.BibliographicDescription.BibliographicRecordId -%]
