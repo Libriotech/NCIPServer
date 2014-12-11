@@ -1,22 +1,19 @@
-<RequestId>
-[% IF data.RequestId.AgencyId -%]
-<AgencyId>[% data.RequestId.AgencyId | xml %]</AgencyId>
-[% END -%]
-[% IF data.RequestId.RequestIdentifierType -%]
-<RequestIdentifierType>[% data.RequestId.RequestIdentifierType | xml %]</RequestIdentifierType>
-[% END %]
-<RequestIdentifierValue>[% data.RequestId.RequestIdentifierValue | xml %]</RequestIdentifierValue>
-</RequestId>
-<UserId>
-[% IF data.UserId.AgencyId -%]
-<AgencyId>[% data.UserId.AgencyId | xml %]</AgencyId>
-[% END -%]
-[% IF data.UserId.UserIdentifierType -%]
-<UserIdentifierType>[% data.UserId.UserIdentifierType | xml %]</UserIdentiferiType>
-<UserIdentifierValue>[% data.UserId.UserIdentifierValue | xml %]</UserIdentifierValue>
-[% END -%]
-</UserId>
+[%-
+    IF data.RequestId;
+        INCLUDE "includes/RequestId.inc";
+    END;
+    INCLUDE "includes/ItemId.inc";
+    INCLUDE "includes/UserId.inc";
+    IF data.RequestType;
+-%]
 <RequestType>[% data.RequestType | xml %]</RequestType>
+[%-
+    END;
+    IF data.RequestScopeType;
+-%]
 <RequestScopeType>[% data.RequestScopeType | xml %]</RequestScopeType>
-[% INCLUDE "includes/ItemOptionalFields.inc" -%]
-[% INCLUDE "includes/UserOptionalFields.inc" -%]
+[%-
+    END;
+    INCLUDE "includes/ItemOptionalFields.inc";
+    INCLUDE "includes/UserOptionalFields.inc"
+-%]
