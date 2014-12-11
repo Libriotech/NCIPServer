@@ -163,18 +163,12 @@ sub lookupuser {
     # We got the information, so lets fill in our userdata.
     my $userdata = NCIP::User->new();
 
-    # Make an array of the user's active barcodes.
-    my $ids = [];
-    foreach my $card (@{$user->cards()}) {
-        if ($U->is_true($card->active())) {
-            my $id = NCIP::User::Id->new({
-                UserIdentifierType => 'Barcode',
-                UserIdentifierValue => $card->barcode()
-            });
-            push(@$ids, $id);
-        }
-    }
-    $userdata->UserId($ids);
+    # Use the user's main card as the UserId.
+    my $id = NCIP::User::Id->new({
+        UserIdentifierType => 'Barcode',
+        UserIdnetifierValue => $user->card->barcode()
+    });
+    $userdata->UserId($id);
 
     # Check if they requested any optional fields and return those.
     my $elements = $request->{$message_type}->{UserElementType};
