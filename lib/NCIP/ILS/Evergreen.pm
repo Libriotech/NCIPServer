@@ -1020,6 +1020,19 @@ sub requestitem {
             RequestType => $request->{$message}->{RequestType},
             RequestScopeType => ($hold->hold_type() eq 'V') ? "item" : "bibliographic item"
         };
+        # Fill in the ItemId based on what we have.
+        if ($item_barcode && ref($item_barcode) ne 'NCIP::Problem') {
+            $data->{ItemId} = NCIP::Item::Id->new({
+                ItemIdentifierValue => $item_barcode,
+                ItemIdentifierType => 'Barcode'
+            });
+        } else {
+            $data->{ItemId} = NCIP::Item::Id->new({
+                ItemIdentifierValue => $item->id(),
+                ItemIdentifierType => 'SYSNUMBER'
+            })
+        }
+
         # Look for UserElements requested and add it to the response:
         my $elements = $request->{$message}->{UserElementType};
         if ($elements) {
