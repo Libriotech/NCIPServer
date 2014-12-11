@@ -4,18 +4,18 @@
 <NameInformation>
 <PersonalNameInformation>
 <StructuredPersonalUserName>
-[% IF data.UserOptionalFields.NameInformation.GivenName -%]
-<GivenName>[% data.UserOptionalFields.NameInformation.GivenName | xml %]</GivenName>
-[% END -%]
-<Surname>[% data.UserOptionalFields.NameInformation.Surname | xml %]</Surname>
 [% IF data.UserOptionalFields.NameInformation.Prefix -%]
 <Prefix>[% data.UserOptionalFields.NameInformation.Prefix %]</Prefix>
 [% END -%]
-[% IF data.UserOptionalFields.NameInformation.Suffix -%]
-<Suffix>[% data.UserOptionalFields.NameInformation.Suffix %]</Suffix>
+[% IF data.UserOptionalFields.NameInformation.GivenName -%]
+<GivenName>[% data.UserOptionalFields.NameInformation.GivenName | xml %]</GivenName>
 [% END -%]
 [% IF data.UserOptionalFields.NameInformation.Initials -%]
 <Initials>[% data.UserOptionalFields.NameInformation.Initials %]</Initials>
+[% END -%]
+<Surname>[% data.UserOptionalFields.NameInformation.Surname | xml %]</Surname>
+[% IF data.UserOptionalFields.NameInformation.Suffix -%]
+<Suffix>[% data.UserOptionalFields.NameInformation.Suffix %]</Suffix>
 [% END -%]
 </StructuredPersonalUserName>
 </PersonalNameInformation>
@@ -56,6 +56,10 @@
 </UserAddressInformation>
 [% END -%]
 [% END -%]
+[% IF data.UserOptionalFields.UserLanguage -%]
+[% FOREACH language IN data.UserOptionalFields.UserLanguage -%]
+<UserLanguage>[% language | xml %]</UserLanguage>
+[% END -%]
 [% IF data.UserOptionalFields.UserPrivilege -%]
 [% FOREACH privilege IN data.UserOptionalFields.UserPrivilege -%]
 <UserPrivilege>
@@ -80,10 +84,6 @@
 [% END -%]
 </UserPrivilege>
 [% END -%]
-[% END -%]
-[% IF data.UserOptionalFields.UserLanguage -%]
-[% FOREACH language IN data.UserOptionalFields.UserLanguage -%]
-<UserLanguage>[% language | xml %]</UserLanguage>
 [% END -%]
 [% END -%]
 [% IF data.UserOptionalFields.BlockOrTrap -%]

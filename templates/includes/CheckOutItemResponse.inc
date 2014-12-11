@@ -1,4 +1,13 @@
-[% INCLUDE "includes/CheckInItemResponse.inc" %]
-[% IF data.DateDue -%]
+[%-
+    INCLUDE "includes/ItemId.inc";
+    IF data.UserId;
+        INCLUDE "includes/UserId.inc";
+    END;
+    IF data.DateDue
+-%]
 <DateDue>[% data.DateDue | xml %]</DateDue>
-[% END -%]
+[%-
+    END;
+    INCLUDE "includes/ItemOptionalFields.inc";
+    INCLUDE "includes/UserOptionalFields.inc";
+-%]
