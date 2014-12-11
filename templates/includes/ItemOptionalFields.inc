@@ -17,7 +17,7 @@
 [% IF data.ItemOptionalFields.BibliographicDescription.BibliographicRecordId;
       id = data.ItemOptionalFields.BibliographicDescription.BibliographicRecordId -%]
 <BibliographicRecordId>
-<BibliographicRecordIdentifier>[% id.BibliographicRecordIdentifier | xml %]</BibliographicRecordIdentifer>
+<BibliographicRecordIdentifier>[% id.BibliographicRecordIdentifier | xml %]</BibliographicRecordIdentifier>
 [% IF id.AgencyId -%]
 <AgencyId>[% id.AgencyId | xml %]</AgencyId>
 [% ELSIF id.BibliographicRecordIdentifierCode -%]
