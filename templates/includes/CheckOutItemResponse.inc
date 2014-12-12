@@ -6,7 +6,7 @@
     IF data.DateDue
 -%]
 <DateDue>[% data.DateDue | xml %]</DateDue>
-[%-
+[%
     END;
     INCLUDE "includes/ItemOptionalFields.inc";
     INCLUDE "includes/UserOptionalFields.inc";
