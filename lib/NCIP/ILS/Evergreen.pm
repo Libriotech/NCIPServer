@@ -795,6 +795,30 @@ sub checkoutitem {
         return $response;
     }
 
+    # Check for the copy being in transit and receive or abort it.
+    my $transit = $U->simplereq(
+        'open-ils.circ.open_copy_transit.retrieve',
+        $self->{session}->{authtoken},
+        $copy->id()
+    );
+    if (ref($transit) eq 'Fieldmapper::action::transit_copy') {
+        if ($transit->dest() == $self->{session}->{work_ou}->id()) {
+            my $r = $U->simplereq(
+                'open-ils.circ',
+                'open-ils.circ.copy_transit.receive',
+                $self->{session}->{authtoken},
+                {copyid => $copy->id()}
+            );
+        } elsif ($transit->source() == $self->{session}->{work_ou}->id()) {
+            my $r = $U->simplereq(
+                'open-ils.circ',
+                'open-ils.circ.transit.abort',
+                $self->{session}->{authtoken},
+                {copyid => $copy->id()}
+            );
+        }
+    }
+
     # Now, we attempt the check out. If it fails, we simply say that
     # the user is not allowed to check out this item, without getting
     # into details.
