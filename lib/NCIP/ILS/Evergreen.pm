@@ -1053,8 +1053,14 @@ sub requestitem {
         } else {
             $data->{ItemId} = NCIP::Item::Id->new({
                 ItemIdentifierValue => $item->id(),
-                ItemIdentifierType => 'SYSNUMBER'
-            })
+            });
+            # if we have an $ou, we return the AgencyId, else set
+            # ItemIdentifierType.
+            if ($ou) {
+                $data->{ItemId}->AgencyId($ou->shortname());
+            } else {
+                $data->{ItemId}->ItemIdentifierType('SYSNUMBER');
+            }
         }
 
         # Look for UserElements requested and add it to the response:
