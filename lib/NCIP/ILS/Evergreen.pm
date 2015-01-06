@@ -797,6 +797,7 @@ sub checkoutitem {
 
     # Check for the copy being in transit and receive or abort it.
     my $transit = $U->simplereq(
+        'open-ils.circ',
         'open-ils.circ.open_copy_transit.retrieve',
         $self->{session}->{authtoken},
         $copy->id()
