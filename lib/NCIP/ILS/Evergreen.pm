@@ -908,6 +908,15 @@ sub requestitem {
     my $response = NCIP::Response->new({type => $message . 'Response'});
     $response->header($self->make_header($request));
 
+    # We originally had a mass of complicated code here to handle most
+    # of the possibilities provided by the standard.  However, that
+    # proved too difficult to get working with what we've agreed to do
+    # with Auto-Graphics.  The response was supposed to include the
+    # ItemId, and for some reason that I couldn't figure out it was
+    # not there.  In order to get this working, I've decided to ignor
+    # the extra stuff in the standard and just go with what our
+    # current vendor sends.
+
     # Because we need to have a user to place a hold, because the user
     # is likely to have problems, and because getting the item
     # information for the hold is trickier than getting the user
@@ -929,140 +938,109 @@ sub requestitem {
         return $response;
     }
 
-    # RequestItem is a blast. We need to check if we have a copy
-    # barcode and/or if we have BibliographicIds. If we have both or
-    # either, we then need to figure out what we're placing the hold
-    # on, a copy, a volume or a bib. We don't currently do part holds,
-    # but maybe we should some day. We can also be sent more than 1
-    # BibliographicId, so we look for certain identifiers first, and
-    # then others in decreasing preference: SYSNUMBER, ISBN, and ISSN.
-
-    # Not to mention that there are two kinds of BibliographicId field
-    # with different field names, and both can be intermixed in an
-    # incoming message! (I just /love/ this nonsense.)
-
-    # This here is the thing we're going to put on hold:
-    my $item;
-
-    # We need copy details if we find in a couple of places below.
-    my $copy_details;
-
-    # We need the copy barcode from the message.
-    my ($item_barcode, $item_idfield) = $self->find_item_barcode($request);
-    if (ref($item_barcode) ne 'NCIP::Problem') {
-        # Retrieve the copy details.
-        $copy_details = $self->retrieve_copy_details_by_barcode($item_barcode);
-        unless ($copy_details) {
-            # Return an Unknown Item problem unless we find the copy.
-            $response->problem(
-                NCIP::Problem->new(
-                    {
-                        ProblemType => 'Unknown Item',
-                        ProblemDetail => "Item with barcode $item_barcode is not known.",
-                        ProblemElement => $item_idfield,
-                        ProblemValue => $item_barcode
-                    }
-                )
-            );
-            return $response;
-        }
-        $item = $copy_details->{volume}; # We place a volume hold.
-    }
-
-    # We weren't given copy information to target, or we can't find
-    # it, so we need to look for a target via BibliographicId.
-    unless ($item) {
-        my @biblio_ids = $self->find_bibliographic_ids($request);
-        if (@biblio_ids) {
-            $item = $self->find_target_via_bibliographic_id(@biblio_ids);
-        }
-    }
-
-    # If we don't have an item, then blow up with a problem that may
-    # have been set when we went looking for the ItemId.
-    unless ($item) {
-        if (ref($item_barcode) eq 'NCIP::Problem') {
-            $response->problem($item_barcode);
-        } else {
-            $response->problem(
-                NCIP::Problem->new(
-                    {
-                        ProblemType => 'Request Item Not Found',
-                        ProblemDetail => 'Unable to determine the item to request from input message.',
-                        ProblemElement => 'NULL',
-                        ProblemValue => 'NULL'
-                    }
-                )
+    # Auto-Graphics send a single BibliographicRecordId to identify
+    # the "item" to place on hold.
+    my $bibid;
+    if ($request->{$message}->{BibliographicId}) {
+        my $idxml = $request->{$message}->{BibliographicId};
+        # The standard allows more than 1.  If that hapens, we only
+        # use the first.
+        $idxml = $idxml->[0] if (ref($idxml) eq 'ARRAY');
+        if ($idxml->{BibliographicRecordId}) {
+            $bibid = NCIP::Item::BibliographicRecordId->new(
+                $idxml->{BibliographicRecordId}
             );
         }
-        return $response;
-    } elsif (ref($item) eq 'NCIP::Problem') {
-        $response->problem($item);
+    }
+    unless ($bibid && $bibid->{BibliographicRecordIdentifier}) {
+        $problem = NCIP::Problem->new(
+            {
+                ProblemType => 'Needed Data Missing',
+                ProblemDetail => 'Need BibliographicRecordIdentifier to place request',
+                ProblemElement => 'BibliographicRecordIdentifier',
+                ProblemValue => 'NULL'
+            }
+        );
+        $response->problem($problem);
         return $response;
     }
 
-    # We have an item.  If we have a biblio.record_entry object,
-    # Auto-Graphics expects us to place the hold such that it is
-    # limited to the branch or system whose id they have given us.
-    # We, therefore, look for an org_unit based on the ToAgencyId from
-    # the InitiationHeader.
-    my $ou;
-    if (ref($item) eq 'Fieldmapper::biblio::record_entry') {
-        $ou = $self->find_location_failover(undef, $request, $message);
+    # We need an actual bre.
+    my $bre = $self->retrieve_biblio_record_entry($bibid->{BibliographicRecordIdentifier});
+    if (!$bre || $U->is_true($bre->deleted())) {
+        $problem = NCIP::Problem->new(
+            {
+                ProblemType => 'Unknown Item',
+                ProblemDetail => 'Item ' . $bibid->{BibliographicRecordIdentifier} . ' is unknown',
+                ProblemElement => 'BibliographicRecordIdentifier',
+                ProblemValue => $bibid->{BibliographicRecordIdentifier}
+            }
+        );
+        $response->problem($problem);
+        return $response;
     }
 
-    # See if we were given a PickupLocation.
-    my $location;
+    # Auto-Graphics expects us to limit the selection ou for the hold
+    # to a given library.  We look fo that in the AgencyId of the
+    # BibliographRecordId or in the ToAgencyId of the main message.
+    my $selection_ou = $self->find_location_failover($bibid->{AgencyId}, $request, $message);
+
+    # We need to see if the bib exists and has a holdable, not deleted
+    # copy at the selection_ou.  If successful, we retun a
+    # copy_details hashref for the holdable copy.
+    my $copy_details = $self->find_target_details_by_bre($bre, $selection_ou);
+    unless ($copy_details) {
+        # We don't know if the items do not circulate or are not
+        # holdable, but the closest "standard" problem message is Item
+        # Does Not Circulate.
+        $problem = NCIP::Problem->new(
+            {
+                ProblemType => 'Item Does Not Circulate',
+                ProblemDetail => 'Request of Item cannot proceed because the Item is non-circulating',
+                ProblemElement => 'BibliographicRecordIdentifier',
+                ProblemValue => $bre->id()
+            }
+        );
+        $response->problem($problem);
+        return $response;
+    }
+
+    # See if we were given a pickup location.
+    my $pickup_ou;
     if ($request->{$message}->{PickupLocation}) {
         my $loc = $request->{$message}->{PickupLocation};
-        $loc =~ s/^.*://; # strip everything up to the last
-                          # semi-colon, if any.
-        $location = $self->retrieve_org_unit_by_shortname($loc);
+        $loc =~ s/^.*://;
+        $pickup_ou = $self->retrieve_org_unit_by_shortname($loc);
     }
 
-    # Look for a NeedBeforeDate to use as expiration...
-    my $hold_expiration = $request->{$message}->{NeedBeforeDate};
+    # Look for a NeedBeforeDate to set the expiration.
+    my $expiration = $request->{$message}->{NeedBeforeDate};
 
-    # Place the hold.
-    my $hold = $self->place_hold($item, $user, $location, $hold_expiration, $ou);
+    # Place the hold:
+    my $hold = $self->place_hold($bre, $user, $pickup_ou, $expiration, $selection_ou);
     if (ref($hold) eq 'NCIP::Problem') {
         $response->problem($hold);
     } else {
         my $data = {
             RequestId => NCIP::RequestId->new(
+                $request->{$message}->{RequestId}
+            ),
+            ItemId => NCIP::Item::Id->new(
                 {
-                    AgencyId => $request->{$message}->{RequestId}->{AgencyId},
-                    RequestIdentifierType => $request->{$message}->{RequestId}->{RequestIdentifierType},
-                    RequestIdentifierValue => $request->{$message}->{RequestId}->{RequestIdentifierValue}
+                    AgencyId => $selection_ou->shortname(),
+                    ItemIdentifierValue => $bre->id(),
+                    ItemIdentifierType => 'SYSNUMBER'
                 }
             ),
             UserId => NCIP::User::Id->new(
                 {
-                    UserIdentifierType => 'Barcode Id',
-                    UserIdentifierValue => $user->card->barcode()
+                    UserIdentifierValue => $user->card->barcode(),
+                    UserIdentifierType => 'Barcode Id'
                 }
             ),
             RequestType => $request->{$message}->{RequestType},
-            RequestScopeType => $request->{$message}->{RequestScopeType}
+            RequestScopeType => $request->{$message}->{RequestScopeType},
         };
-        # Fill in the ItemId based on what we have.
-        if ($item_barcode && ref($item_barcode) ne 'NCIP::Problem') {
-            $data->{ItemId} = NCIP::Item::Id->new({
-                ItemIdentifierValue => $item_barcode,
-                ItemIdentifierType => 'Barcode'
-            });
-        } else {
-            $data->{ItemId} = NCIP::Item::Id->new({
-                ItemIdentifierValue => $item->id(),
-            });
-            # if we have an $ou, we return the AgencyId, else set
-            # ItemIdentifierType.
-            if ($ou) {
-                $data->{ItemId}->AgencyId($ou->shortname());
-            } else {
-                $data->{ItemId}->ItemIdentifierType('SYSNUMBER');
-            }
-        }
 
         # Look for UserElements requested and add it to the response:
         my $elements = $request->{$message}->{UserElementType};
@@ -1073,7 +1051,6 @@ sub requestitem {
         }
         $elements = $request->{$message}->{ItemElementType};
         if ($elements) {
-            $copy_details = $self->find_copy_details_by_item($item) unless ($copy_details);
             $elements = [$elements] unless (ref($elements) eq 'ARRAY');
             my $optionalfields = $self->handle_item_elements($copy_details->{copy}, $elements);
             $data->{ItemOptionalFields} = $optionalfields;
@@ -1855,58 +1832,6 @@ sub retrieve_copy_details_by_id {
     return $copy;
 }
 
-=head2 find_copy_details_by_item
-
-    $copy_details = $ils->find_copy_details_by_item($item);
-
-This routine returns a copy_details hashref (See:
-retrieve_copy_details_by_barcode) for a given item. It attempts to
-find the "first" copy for the given item. If item is a call number it
-looks for the first, not deleted copy. If item is a bib, it looks for
-the first not deleted copy on the first not deleted call number. If
-item is a copy, it simply returns the details for the copy.
-
-=cut
-
-sub find_copy_details_by_item {
-    my $self = shift;
-    my $item = shift;
-
-    my ($details);
-
-    if (ref($item) eq 'Fieldmapper::biblio::record_entry') {
-        my $acns = $U->simplereq(
-            'open-ils.pcrud',
-            'open-ils.pcrud.search.acn.atomic',
-            $self->{session}->{authtoken},
-            {
-                record => $item->id(),
-                deleted => 'f'
-            }
-        );
-        ($item) = sort {$a->id() <=> $b->id()} @{$acns};
-    }
-
-    if (ref($item) eq 'Fieldmapper::asset::call_number') {
-        my $copies = $U->simplereq(
-            'open-ils.pcrud',
-            'open-ils.pcrud.search.acp.atomic',
-            $self->{session}->{authtoken},
-            {
-                call_number => $item->id(),
-                deleted => 'f'
-            }
-        );
-        ($item) = sort {$a->id() <=> $b->id()} @{$copies};
-    }
-
-    if (ref($item) eq 'Fieldmapper::asset::copy') {
-        $details = $self->retrieve_copy_details_by_barcode($item->barcode());
-    }
-
-    return $details;
-}
-
 =head2 retrieve_copy_status
 
     $status = $ils->retrieve_copy_status($id);
@@ -2406,7 +2331,7 @@ sub place_hold {
         );
         if (ref($hold)) {
             $hold = $hold->[0] if (ref($hold) eq 'ARRAY');
-            $hold = _problem_from_event('Request Not Possible', $hold);
+            $hold = _problem_from_event('User Ineligible To Request This Item', $hold);
         } else {
             # open-ils.circ.holds.create.override returns the id on
             # success, so we retrieve the full hold object from the
@@ -2419,11 +2344,11 @@ sub place_hold {
             );
         }
     } elsif ($r->{last_event}) {
-        $hold = _problem_from_event('Request Not Possible', $r->{last_event});
+        $hold = _problem_from_event('User Ineligible To Request This Item', $r->{last_event});
     } elsif ($r->{textcode}) {
-        $hold = _problem_from_event('Request Not Possible', $r);
+        $hold = _problem_from_event('User Ineligible To Request This Item', $r);
     } else {
-        $hold = _problem_from_event('Request Not Possible');
+        $hold = _problem_from_event('User Ineligible To Request This Item');
     }
 
     return $hold;
@@ -2517,27 +2442,6 @@ sub copy_can_circulate {
     return ($U->is_true($copy->circulate()) && $U->is_true($location->circulate()));
 }
 
-=head2 copy_can_fulfill
-
-    $can_fulfill = $ils->copy_can_fulfill($copy);
-
-Check if the copy's location and the copy itself allow
-holds. Return true if they do, and false if they do not.
-
-=cut
-
-sub copy_can_fulfill {
-    my $self = shift;
-    my $copy = shift;
-
-    my $location = $copy->location();
-    unless (ref($location)) {
-        $location = $self->retrieve_copy_location($location);
-    }
-
-    return ($U->is_true($copy->holdable()) && $U->is_true($location->holdable()));
-}
-
 =head1 OVERRIDDEN PARENT METHODS
 
 =head2 find_user_barcode
@@ -2605,107 +2509,45 @@ sub find_item_barcode {
     return (wantarray) ? ($value, $idfield) : $value;
 }
 
-=head2 find_target_via_bibliographic_id
+=head2 find_target_details_by_bre
 
-    $item = $ils->find_target_via_bibliographic_id(@biblio_ids);
+    $copy_details = $ils->find_target_details_by_bre($bre, $selection_ou);
 
-Searches for a bibliographic record to put on hold and returns an
-appropriate hold target item depending upon what it finds. If an
-appropriate, single target cannot be found, it returns an
-NCIP::Problem with the problem message.
-
-Currently, we only look for SYSNUMBER, ISBN, and ISSN record
-identifiers. If nothing is found, this method can return undef. (Gotta
-love Perl and untyped/weakly typed languages in general!)
-
-TODO: Figure out how to search OCLC numbers. We probably need to use
-"MARC Expert Search" if we don't want to do a JSON query on
-metabib.full_rec.
+Returns copy details hashref for the "first" holdable copy found on a
+biblio.record_entry at an optionally given selection organization.  If
+no suitable copy is found, this method returns undef.
 
 =cut
 
-sub find_target_via_bibliographic_id {
+sub find_target_details_by_bre {
     my $self = shift;
-    my @biblio_ids = @_;
+    my $bre = shift;
+    my $selection_ou = shift;
 
-    # The item that we find:
-    my $item;
+    # The copy details that we find:
+    my $details;
 
-    # Id for our bib in Evergreen:
-    my $bibid;
-
-    # First, let's look for a SYSNUMBER:
-    my ($idobj) = grep
-        { ($_->{BibliographicRecordIdentifierCode} && $_->{BibliographicRecordIdentifierCode} eq 'SYSNUMBER')
-              || ($_->{BibliographicItemIdentifierCode} && $_->{BibliographicItemIdentifierCode} eq 'SYSNUMBER')
-              || $_->{AgencyId} }
-            @biblio_ids;
-    if ($idobj) {
-        my $loc;
-        # BibliographicRecordId can have an AgencyId field if the
-        # BibliographicRecordIdentifierCode is absent.
-        if ($idobj->{AgencyId}) {
-            $bibid = $idobj->{BibliographicRecordIdentifier};
-            my $locname = $idobj->{AgencyId};
-            if ($locname) {
-                $locname =~ s/^.*://;
-                $loc = $self->retrieve_org_unit_by_shortname($locname);
-            }
-        } elsif ($idobj->{BibliographicRecordIdentifierCode}) {
-            $bibid = $idobj->{BibliographicRecordIdentifier};
-        } else {
-            $bibid = $idobj->{BibliographicItemIdentifier};
+    # We're going to search for non-deleted call numbers and flesh
+    # copies with copy location and copy status.
+    my $acns = $self->_call_number_search($bre->id(), $selection_ou, 1);
+    if ($acns && @$acns) {
+        # Now, we get available copies, sorted by status id.  We
+        # only need one, so we take the first that comes out.
+        my @copies;
+        foreach (@$acns) {
+            push(@copies, @{$_->copies()});
         }
-        if ($bibid && $loc) {
-            $item = $self->_call_number_search($bibid, $loc);
-        } else {
-            $item = $U->simplereq(
-                'open-ils.pcrud',
-                'open-ils.pcrud.retrieve.bre',
-                $self->{session}->{authtoken},
-                $bibid
-            );
+        my ($copy) = sort {$a->status->id() <=> $b->status->id()}
+            grep { $_->deleted() eq 'f' && $_->holdable() eq 't' && $_->circulate() eq 't' &&
+                       $_->location->holdable() eq 't' && $_->location->circulate() eq 't' &&
+                           $_->status->holdable() eq 't' && $_->status->copy_active() eq 't' }
+                @copies;
+        if ($copy) {
+            $details = $self->retrieve_copy_details_by_id($copy->id());
         }
-        # Check if item is deleted so we'll look for more
-        # possibilties.
-        undef($item) if ($item && $U->is_true($item->deleted()));
     }
 
-    # Build an array of id objects based on the other identifier fields.
-    my @idobjs = grep
-        {
-            ($_->{BibliographicRecordIdentifierCode} && $_->{BibliographicRecordIdentifierCode} eq 'ISBN')
-                || ($_->{BibliographicItemIdentifierCode} && $_->{BibliographicItemIdentifierCode} eq 'ISBN')
-                || ($_->{BibliographicRecordIdentifierCode} && $_->{BibliographicRecordIdentifierCode} eq 'ISSN')
-                || ($_->{BibliographicItemIdentifierCode} && $_->{BibliographicItemIdentifierCode} eq 'ISSN')
-        } @biblio_ids;
-
-    if (@idobjs) {
-        my $stashed_problem;
-        # Reuse $idobj from above.
-        foreach $idobj (@idobjs) {
-            my ($idvalue, $idtype, $idfield);
-            if ($_->{BibliographicItemIdentifier}) {
-                $idvalue = $_->{BibliographicItemIdentifier};
-                $idtype = $_->{BibliographicItemIdentifierCode};
-                $idfield = 'BibliographicItemIdentifier';
-            } else {
-                $idvalue = $_->{BibliographicRecordIdentifier};
-                $idtype = $_->{BibliographicRecordIdentifierCode};
-                $idfield = 'BibliographicRecordIdentifier';
-            }
-            $item = $self->_bib_search($idvalue, $idtype);
-            if (ref($item) eq 'NCIP::Problem') {
-                $stashed_problem = $item unless($stashed_problem);
-                $stashed_problem->ProblemElement($idfield);
-                undef($item);
-            }
-            last if ($item);
-        }
-        $item = $stashed_problem if (!$item && $stashed_problem);
-    }
-
-    return $item;
+    return $details;
 }
 
 =head2 find_location_failover
@@ -2855,61 +2697,39 @@ sub _init {
     }
 }
 
-# Search asset.call_number by a bre.id and location object. Return the
-# "closest" call_number if found, undef otherwise.
+# Search asset.call_number by a bre.id and location object.
 sub _call_number_search {
     my $self = shift;
     my $bibid = shift;
     my $location = shift;
+    my $flesh = shift;
 
-    # At some point, this should be smarter, and we should retrieve
-    # ancestors and descendants and search with a JSON query or some
-    # such with results ordered by proximity to the original location,
-    # but I don't have time to implement that right now.
-    my $acn = $U->simplereq(
-        'open-ils.pcrud',
-        'open-ils.pcrud.search.acn',
-        $self->{session}->{authtoken},
-        {record => $bibid, owning_lib => $location->id()}
-    );
-
-    return $acn;
-}
-
-# Do a multiclass.query to search for items by isbn or issn.
-sub _bib_search {
-    my $self = shift;
-    my $idvalue = shift;
-    my $idtype = shift;
-    my $item;
-
-    my $result = $U->simplereq(
-        'open-ils.search',
-        'open-ils.search.biblio.multiclass',
-        {searches => {lc($idtype) => $idvalue}}
-    );
-
-    if ($result && $result->{count}) {
-        if ($result->{count} > 1) {
-            $item = NCIP::Problem->new(
-                {
-                    ProblemType => 'Non-Unique Item',
-                    ProblemDetail => 'More than one item matches the request.',
-                    ProblemElement => '',
-                    ProblemValue => $idvalue
-                }
-            );
-        }
-        my $bibid = $result->{ids}->[0]->[0];
-        $item = $U->simplereq(
-            'open-ils.pcrud',
-            'open-ils.pcrud.retrieve.bre',
-            $self->{session}->{authtoken},
-            $bibid
-        );
+    my $search = {record => $bibid, deleted => 'f'};
+    if ($location) {
+        $search->{owning_lib} = $location->id();
     }
 
-    return $item;
+    # If flesh is passed a true value, we flesh copies, copy status,
+    # and copy location for the call numbers.
+    if ($flesh) {
+        $flesh = {
+            flesh => 2,
+            flesh_fields => {
+                acn => ['copies'],
+                acp => ['status', 'location']
+            }
+        }
+    }
+
+    my $acns = $U->simplereq(
+        'open-ils.pcrud',
+        'open-ils.pcrud.search.acn.atomic',
+        $self->{session}->{authtoken},
+        $search,
+        $flesh
+    );
+
+    return $acns;
 }
 
 # Search for holds using the user, idvalue and selection_ou.
