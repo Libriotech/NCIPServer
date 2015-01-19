@@ -2,7 +2,7 @@
     IF data.RequestId.RequestIdentifierValue;
         INCLUDE "includes/RequestId.inc";
     END;
-    IF data.ItemId.ItemIdentiferValue;
+    IF data.ItemId.ItemIdentifierValue;
         INCLUDE "includes/ItemId.inc";
     END;
     INCLUDE "includes/UserId.inc";
