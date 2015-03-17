@@ -173,7 +173,7 @@ sub request {
         }
     }
     unless ($itemdata) {
-        $result = { success => 0, messages => {'ITEM_NOT_FOUND'} };
+        $result = { success => 0, messages => { 'ITEM_NOT_FOUND' => 1 } };
         return $result;
     }
     $self->userenv();
