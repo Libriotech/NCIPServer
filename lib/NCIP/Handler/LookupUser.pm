@@ -76,7 +76,10 @@ sub handle {
 
         # if we have blank user, we need to return that
         # and can skip looking for elementtypes
-        if ( $user->userdata->{'borrowernumber'} eq '' ) {
+        if ( ! defined $user->userdata || $user->userdata->{'borrowernumber'} eq '' ) {
+            $vars->{'processingerror'} = 1;
+            $vars->{'processingerrortype'} = { 'FIXME' => 1 }; # $renewed->{'messages'};
+            $vars->{'processingerrorelement'} = 'FIXME';
             $vars->{'messagetype'}  = 'LookupUserResponse';
             $vars->{'error_detail'} = "Borrower not found";
             my $output = $self->render_output( 'problem.tt', $vars );
