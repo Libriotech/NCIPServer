@@ -1,49 +1,49 @@
 
-<UserId>
-<UserIdentifierValue>[% user.userdata.cardnumber | xml %]</UserIdentifierValue>
-</UserId>
-[%# <UserFiscalAccount></UserFiscalAccount>
-LoanedItemsCount
-LoanedItem
-RequestedItemsCount
-RequestedItem
+<ns1:UserId>
+<ns1:UserIdentifierValue>[% user.userdata.cardnumber | xml %]</ns1:UserIdentifierValue>
+</ns1:UserId>
+[%# <ns1:UserFiscalAccount></ns1:UserFiscalAccount>
+ns1:LoanedItemsCount
+ns1:LoanedItem
+ns1:RequestedItemsCount
+ns1:RequestedItem
 %]
-<UserOptionalFields>
+<ns1:UserOptionalFields>
 [% FOREACH element IN elements %]
   [% IF element.textContent == 'User Address Information' %]
-     <UserAddressInformation>
-      <UserAddressRoleType>Primary Address</UserAddressRoleType>
-     <PhysicalAddress>
-       <StructuredAddress>
-       <Line1>[% user.userdata.streetnumber | xml %] [% user.userdata.address | xml %]</Line1>
+     <ns1:UserAddressInformation>
+      <ns1:UserAddressRoleType>Primary Address</ns1:UserAddressRoleType>
+     <ns1:PhysicalAddress>
+       <ns1:StructuredAddress>
+       <ns1:Line1>[% user.userdata.streetnumber | xml %] [% user.userdata.address | xml %]</ns1:Line1>
        [% IF user.userdata.address2 %]
-       <Line2>[% user.userdata.address2 | xml %]</Line2>
+       <ns1:Line2>[% user.userdata.address2 | xml %]</ns1:Line2>
        [% END %]
        [% IF user.userdata.city %]
-       <Locality>[% user.userdata.city | xml %]</Locality>
+       <ns1:Locality>[% user.userdata.city | xml %]</ns1:Locality>
        [% END %]
        [% IF user.userdata.state %]
-       <Region>[% user.userdata.state | xml %]</Region>
+       <ns1:Region>[% user.userdata.state | xml %]</ns1:Region>
        [% END %]
        [% IF user.userdata.zipcode %]
-       <PostalCode>[% user.userdata.zipcode | xml %]</PostalCode>
+       <ns1:PostalCode>[% user.userdata.zipcode | xml %]</ns1:PostalCode>
        [% END %]
        [% IF user.userdata.country %]
-       <Country>[% user.userdata.country | xml %]</Country>
+       <ns1:Country>[% user.userdata.country | xml %]</ns1:Country>
        [% END %]
-       </StructuredAddress>
-     </PhysicalAddress>
-     </UserAddressInformation>
+       </ns1:StructuredAddress>
+     </ns1:PhysicalAddress>
+     </ns1:UserAddressInformation>
   [% END %]
   [% IF element.textContent == 'Name Information' %]
-    <NameInformation>
-      <PersonalNameInformation>
-        <StructuredPersonalUserName>
-          <GivenName>[% user.userdata.firstname | xml %]</GivenName>
-          <Surname>[% user.userdata.surname | xml %]</Surname>
-        </StructuredPersonalUserName>
-      </PersonalNameInformation>
-    </NameInformation>
+    <ns1:NameInformation>
+      <ns1:PersonalNameInformation>
+        <ns1:StructuredPersonalUserName>
+          <ns1:GivenName>[% user.userdata.firstname | xml %]</ns1:GivenName>
+          <ns1:Surname>[% user.userdata.surname | xml %]</ns1:Surname>
+        </ns1:StructuredPersonalUserName>
+      </ns1:PersonalNameInformation>
+    </ns1:NameInformation>
   [% END %]
 [% END %]
-</UserOptionalFields>
+</ns1:UserOptionalFields>

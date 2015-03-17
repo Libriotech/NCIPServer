@@ -1,5 +1,5 @@
 [% FOREACH version IN versions %]
-<VersionSupported>
+<ns1:VersionSupported>
 [% version %]
-</VersionSupported>
+</ns1:VersionSupported>
 [% END %]
