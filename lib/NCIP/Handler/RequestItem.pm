@@ -33,6 +33,9 @@ sub handle {
         my ($itemid) = $xpc->findnodes( '//ns:ItemIdentifierValue', $root );
         $itemid = $itemid->textContent() if $itemid;
 
+        my ($requesttype) = $xpc->findnodes( '//ns:RequestType', $root );
+        $requesttype = $requesttype->textContent() if $requesttype;
+
         my ($biblio_id) =
           $xpc->findnodes( '//ns:BibliographicRecordIdentifier', $root );
         my ($biblio_type) =
@@ -55,9 +58,12 @@ sub handle {
             $output = $self->render_output( 'problem.tt', $vars );
         }
         else {
+            # This calls NCIP::Handler::get_user_elements(), which seems to be
+            # related to LookupUser, not RequestItem. Copy/paste error?
             my $elements = $self->get_user_elements($xmldoc);
             $vars->{'elements'} = $elements;
-
+            $vars->{'requesttype'} = $requesttype;
+            $vars->{'userid'} = $userid;
             $vars->{'messages'} = $result->{messages};
             $output = $self->render_output( 'response.tt', $vars );
         }
