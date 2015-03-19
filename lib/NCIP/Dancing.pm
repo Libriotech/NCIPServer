@@ -11,8 +11,9 @@ any [ 'get', 'post' ] => '/' => sub {
     if ( request->is_post ) {
         $xml = request->body;
     }
+    warn "---------------------------\n$xml"; # FIXME Debug
     my $content = $ncip->process_request($xml);
-#    warn $content;
+    warn "---------------------------\n$content"; # FIXME Debug
     template 'main', { content => $content };
 };
 
