@@ -11,6 +11,12 @@ any [ 'get', 'post' ] => '/' => sub {
     if ( request->is_post ) {
         $xml = request->body;
     }
+    # Weirdness: If the request XML is all on one long line, I get this error:
+    #     Got a node, but no child node at /home/magnus/NCIPServer/lib/NCIP.pm line 146.
+    # And the response is alwasy an empty <ns1:ItemRequestedResponse>
+    # The following line breaks up the XML between elements, and makes things
+    # behave much more as expected:
+    $xml =~ s|><|>\n<|g;
     warn "---------------------------\n$xml"; # FIXME Debug
     my $content = $ncip->process_request($xml);
     warn "---------------------------\n$content"; # FIXME Debug
