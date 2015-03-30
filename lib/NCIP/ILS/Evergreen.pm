@@ -2623,24 +2623,27 @@ sub _init {
     # Load the barred groups as pgt objects into a blocked_profiles
     # list.
     $self->{blocked_profiles} = [];
-    foreach (@{$self->{config}->{patrons}->{block_profile}}) {
-        my $pgt;
-        if (ref $_) {
-            $pgt = $U->simplereq(
-                'open-ils.pcrud',
-                'open-ils.pcrud.retrieve.pgt',
-                $self->{session}->{authtoken},
-                $_->{grp}
-            );
-        } else {
-            $pgt = $U->simplereq(
-                'open-ils.pcrud',
-                'open-ils.pcrud.search.pgt',
-                $self->{session}->{authtoken},
-                {name => $_}
-            );
+    if (ref($self->{config}->{patrons}) eq 'HASH') {
+        foreach (@{$self->{config}->{patrons}->{block_profile}}) {
+            my $pgt;
+            if (ref $_) {
+                $pgt = $U->simplereq(
+                    'open-ils.pcrud',
+                    'open-ils.pcrud.retrieve.pgt',
+                    $self->{session}->{authtoken},
+                    $_->{grp}
+                );
+            } else {
+                $pgt = $U->simplereq(
+                    'open-ils.pcrud',
+                    'open-ils.pcrud.search.pgt',
+                    $self->{session}->{authtoken},
+                    {
+                        name => $_}
+                );
+            }
+            push(@{$self->{blocked_profiles}}, $pgt) if ($pgt);
         }
-        push(@{$self->{blocked_profiles}}, $pgt) if ($pgt);
     }
 
     # Load the bib source if we're not using precats.
