@@ -1,60 +1,60 @@
 [% IF data.ItemOptionalFields -%]
-<ItemOptionalFields>
+<ns1:ItemOptionalFields>
 [% IF data.ItemOptionalFields.BibliographicDescription -%]
-<BibliographicDescription>
+<ns1:BibliographicDescription>
 [% IF data.ItemOptionalFields.BibliographicDescription.Author -%]
-<Author>[% data.ItemOptionalFields.BibliographicDescription.Author | xml %]</Author>
+<ns1:Author>[% data.ItemOptionalFields.BibliographicDescription.Author | xml %]</ns1:Author>
 [% END -%]
 [% IF data.ItemOptionalFields.BibliographicDescription.BibliographicItemId;
       id = data.ItemOptionalFields.BibliographicDescription.BibliographicItemId -%]
-<BibliographicItemId>
-<BibliographicItemIdentifier>[% id.BibliographicItemIdentifier | xml %]</BibliographicItemIdentifier>
+<ns1:BibliographicItemId>
+<ns1:BibliographicItemIdentifier>[% id.BibliographicItemIdentifier | xml %]</ns1:BibliographicItemIdentifier>
 [% IF id.BibliographicItemIdentifierCode -%]
-<BibliographicItemIdentifierCode>[% id.BibliographicItemIdentifierCode | xml %]</BibliographicItemIdentifierCode>
+<ns1:BibliographicItemIdentifierCode>[% id.BibliographicItemIdentifierCode | xml %]</ns1:BibliographicItemIdentifierCode>
 [% END -%]
-</BibliographicItemId>
+</ns1:BibliographicItemId>
 [% END -%]
 [% IF data.ItemOptionalFields.BibliographicDescription.BibliographicRecordId;
       id = data.ItemOptionalFields.BibliographicDescription.BibliographicRecordId -%]
-<BibliographicRecordId>
-<BibliographicRecordIdentifier>[% id.BibliographicRecordIdentifier | xml %]</BibliographicRecordIdentifier>
+<ns1:BibliographicRecordId>
+<ns1:BibliographicRecordIdentifier>[% id.BibliographicRecordIdentifier | xml %]</ns1:BibliographicRecordIdentifier>
 [% IF id.AgencyId -%]
-<AgencyId>[% id.AgencyId | xml %]</AgencyId>
+<ns1:AgencyId>[% id.AgencyId | xml %]</ns1:AgencyId>
 [% ELSIF id.BibliographicRecordIdentifierCode -%]
-<BibliographicRecordIdentifierCode>[% id.BibliographicRecordIdentifierCode | xml %]</BibliographicRecordIdentifierCode>
+<ns1:BibliographicRecordIdentifierCode>[% id.BibliographicRecordIdentifierCode | xml %]</ns1:BibliographicRecordIdentifierCode>
 [% END -%]
-</BibliographicRecordId>
+</ns1:BibliographicRecordId>
 [% END -%]
 [% IF data.ItemOptionalFields.BibliographicDescription.Edition -%]
-<Edition>[% data.ItemOptionalFields.BibliographicDescription.Edition | xml %]</Edition>
+<ns1:Edition>[% data.ItemOptionalFields.BibliographicDescription.Edition | xml %]</ns1:Edition>
 [% END -%]
 [% IF data.ItemOptionalFields.BibliographicDescription.PublicationDate -%]
-<PublicationDate>[% data.ItemOptionalFields.BibliographicDescription.PublicationDate | xml %]</PublicationDate>
+<ns1:PublicationDate>[% data.ItemOptionalFields.BibliographicDescription.PublicationDate | xml %]</ns1:PublicationDate>
 [% END -%]
 [% IF data.ItemOptionalFields.BibliographicDescription.Publisher -%]
-<Publisher>[% data.ItemOptionalFields.BibliographicDescription.Publisher | xml %]</Publisher>
+<ns1:Publisher>[% data.ItemOptionalFields.BibliographicDescription.Publisher | xml %]</ns1:Publisher>
 [% END -%]
 [% IF data.ItemOptionalFields.BibliographicDescription.Title -%]
-<Title>[% data.ItemOptionalFields.BibliographicDescription.Title | xml %]</Title>
+<ns1:Title>[% data.ItemOptionalFields.BibliographicDescription.Title | xml %]</ns1:Title>
 [% END -%]
-</BibliographicDescription>
+</ns1:BibliographicDescription>
 [% END -%]
 [% IF data.ItemOptionalFields.ItemUseRestrictionType -%]
-<ItemUseRestrictionType>[% data.ItemOptionalFields.ItemUseRestrictionType | xml %]</ItemUseRestrictionType>
+<ns1:ItemUseRestrictionType>[% data.ItemOptionalFields.ItemUseRestrictionType | xml %]</ns1:ItemUseRestrictionType>
 [% END -%]
 [% IF data.ItemOptionalFields.CirculationStatus -%]
-<CirculationStatus>[% data.ItemOptionalFields.CirculationStatus | xml %]</CirculationStatus>
+<ns1:CirculationStatus>[% data.ItemOptionalFields.CirculationStatus | xml %]</ns1:CirculationStatus>
 [% END -%]
 [% IF data.ItemOptionalFields.ItemDescription -%]
-<ItemDescription>
-<CallNumber>[% data.ItemOptionalFields.ItemDescription.CallNumber | xml %]</CallNumber>
-</ItemDescription>
+<ns1:ItemDescription>
+<ns1:CallNumber>[% data.ItemOptionalFields.ItemDescription.CallNumber | xml %]</ns1:CallNumber>
+</ns1:ItemDescription>
 [% END -%]
 [% IF data.ItemOptionalFields.PhysicalCondition -%]
-<PhysicalCondition>[% data.ItemOptionalFields.PhysicalCondition | xml %]</PhysicalCondition>
+<ns1:PhysicalCondition>[% data.ItemOptionalFields.PhysicalCondition | xml %]</ns1:PhysicalCondition>
 [% END -%]
 [% IF data.ItemOptionalFields.DateDue -%]
-<DateDue>[% data.ItemOptionalFields.DateDue | xml %]</DateDue>
+<ns1:DateDue>[% data.ItemOptionalFields.DateDue | xml %]</ns1:DateDue>
 [% END -%]
-</ItemOptionalFields>
+</ns1:ItemOptionalFields>
 [% END -%]
