@@ -341,7 +341,7 @@ sub find_user_barcode {
             $authinput = [$authinput];
         }
         foreach my $input (@$authinput) {
-            if ($input->{AuthenticationInputType} =~ /barcode/i) {
+            if ($input->{AuthenticationInputType} && $input->{AuthenticationInputType} =~ /barcode/i) {
                 $barcode = $input->{$field};
                 last;
             }

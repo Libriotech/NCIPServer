@@ -1,4 +1,4 @@
-ns1:<RequestId>
+<ns1:RequestId>
 [% IF data.RequestId.AgencyId -%]
 <ns1:AgencyId>[% data.RequestId.AgencyId | xml %]</ns1:AgencyId>
 [% END -%]
