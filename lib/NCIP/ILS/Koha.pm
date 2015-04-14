@@ -206,8 +206,8 @@ sub requestitem {
     # Build the response    
     my $data = {
         RequestId => NCIP::RequestId->new(
-            $request->{$message}->{RequestId}
-            # $request_id is the id of the reserve we added
+            # FIXME Check if one was provided in $request->{$message}->{RequestId}
+            $request_id # the id of the reserve we added
         ),
         ItemId => NCIP::Item::Id->new(
             {
