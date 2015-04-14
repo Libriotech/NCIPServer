@@ -205,10 +205,10 @@ sub requestitem {
 
     # Build the response    
     my $data = {
-        RequestId => NCIP::RequestId->new(
+        RequestId => NCIP::RequestId->new({
             # FIXME Check if one was provided in $request->{$message}->{RequestId}
-            $request_id # the id of the reserve we added
-        ),
+            RequestIdentifierValue => $request_id # the id of the reserve we added
+        }),
         ItemId => NCIP::Item::Id->new(
             {
                 AgencyId => 'FIXME', # $selection_ou->shortname(),
