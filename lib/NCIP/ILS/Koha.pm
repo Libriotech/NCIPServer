@@ -65,6 +65,37 @@ sub new {
 
 =head1 HANDLER METHODS
 
+=head2 itemshipped
+
+    $response = $ils->itemshipped($request);
+
+Handle the NCIP ItemShipped message.
+
+=cut
+
+sub itemshipped {
+
+    my $self = shift;
+    my $request = shift;
+    # Check our session and login if necessary:
+    # FIXME $self->login() unless ($self->checkauth());
+
+    # Common stuff:
+    my $message = $self->parse_request_type($request);
+    my $response = NCIP::Response->new({type => $message . 'Response'});
+    $response->header($self->make_header($request));
+    
+    # FIXME Keep track of this 
+    
+    my $data = {
+        RequestType => $request->{$message}->{RequestType},
+    };
+
+    $response->data($data);
+    return $response;
+
+}
+
 =head2 requestitem
 
     $response = $ils->requestitem($request);
