@@ -13,8 +13,11 @@ any [ 'get', 'post' ] => '/' => sub {
     if ( request->is_post ) {
         $xml = request->body;
     }
+    warn $xml if config->{log_request_xml};
+
     my $content = $ncip->process_request($xml);
-#    warn $content;
+    warn $content if config->{log_response_xml};
+
     template 'main', { content => $content };
 };
 
