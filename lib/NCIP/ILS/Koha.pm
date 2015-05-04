@@ -19,7 +19,7 @@ package NCIP::ILS::Koha;
 use Modern::Perl;
 use Data::Dumper; # FIXME Debug
 
-use C4::Circulation qw { AddRenewal };
+use C4::Circulation qw { AddRenewal CanBookBeRenewed };
 use C4::Members qw{ GetMemberDetails };
 use C4::Items qw { GetItem };
 use C4::Reserves qw {CanBookBeReserved AddReserve GetReservesFromItemnumber CancelReserve GetReservesFromBiblionumber};
@@ -373,8 +373,53 @@ sub renewitem {
 
     # Find the borrower based on the cardnumber
     my $borrower = GetMemberDetails( undef, $cardnumber );
-    if ($borrower) {
-        my $datedue = AddRenewal( $cardnumber, $borrower->{'borrowernumber'} );
+    unless ( $borrower ) {
+        my $problem = NCIP::Problem->new({
+            ProblemType    => 'Unknown User',
+            ProblemDetail  => "User with barcode $cardnumber unknown",
+            ProblemElement => $cardnumber_field,
+            ProblemValue   => 'NULL',
+        });
+        $response->problem($problem);
+        return $response;
+    }
+    
+    my $itemdata;
+    # Find the barcode from the request, if there is one
+    my ( $barcode, $barcode_field ) = $self->find_item_barcode($request);
+    if ($barcode) {
+        # We have a barcode (or something passing itself off as a barcode), 
+        # try to use it to get item data
+        $itemdata = GetItem( undef, $barcode );
+        unless ( $itemdata ) {
+            my $problem = NCIP::Problem->new({
+                ProblemType    => 'Unknown Item',
+                ProblemDetail  => "Item $barcode is unknown",
+                ProblemElement => $barcode_field,
+                ProblemValue   => $barcode,
+            });
+            $response->problem($problem);
+            return $response;
+        }
+    }
+    
+    # Check if renewal is possible
+    my ($ok,$error) = CanBookBeRenewed( $borrower->{'borrowernumber'}, $itemdata->{'itemnumber'} );
+    unless ( $ok ) {
+        my $problem = NCIP::Problem->new({
+            ProblemType    => 'FIXME Can not be renewed',
+            ProblemDetail  => $error,
+            ProblemElement => 'FIXME',
+            ProblemValue   => 'FIXME',
+        });
+        $response->problem($problem);
+        return $response;
+    }
+
+    # Do the actual renewal
+    my $datedue = AddRenewal( $borrower->{'borrowernumber'}, $itemdata->{'itemnumber'} );
+    if ( $datedue ) {
+        # The renewal was successfull
         my $data = {
             ItemId => NCIP::Item::Id->new(
                 {
@@ -394,11 +439,12 @@ sub renewitem {
         $response->data($data);
         return $response;
     } else {
+        # The renewal failed
         my $problem = NCIP::Problem->new({
-            ProblemType    => 'Unknown User',
-            ProblemDetail  => "User with barcode $cardnumber unknown",
-            ProblemElement => $cardnumber_field,
-            ProblemValue   => 'NULL',
+            ProblemType    => 'FIXME Loan not renewed',
+            ProblemDetail  => 'FIXME',
+            ProblemElement => 'FIXME',
+            ProblemValue   => 'FIXME',
         });
         $response->problem($problem);
         return $response;
