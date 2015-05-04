@@ -199,6 +199,27 @@ sub lookupversion {
     return $response;
 }
 
+=head2 lookupagency
+
+Called to handle the LookupAgency service request.
+
+=cut
+
+sub lookupagency {
+    my $self = shift;
+    my $request = shift;
+
+    my $response = NCIP::Response->new({type => "LookupAgencyResponse"});
+    my $payload = {
+        fromagencyid => $request->{LookupVersion}->{ToAgencyId}->{AgencyId},
+        toagencyid => $request->{LookupVersion}->{FromAgencyId}->{AgencyId},
+        applicationprofilesupportedtype => 'NNCIPP 0.1',
+    };
+    $response->data($payload);
+
+    return $response;
+}
+
 =head1 USEFUL METHODS
 
 These are methods of the base class that you may want to use in your
