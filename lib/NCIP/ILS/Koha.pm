@@ -19,10 +19,10 @@ package NCIP::ILS::Koha;
 use Modern::Perl;
 use Data::Dumper; # FIXME Debug
 
+use C4::Circulation qw { AddRenewal };
 use C4::Members qw{ GetMemberDetails };
 use C4::Items qw { GetItem };
-use C4::Reserves
-  qw {CanBookBeReserved AddReserve GetReservesFromItemnumber CancelReserve GetReservesFromBiblionumber};
+use C4::Reserves qw {CanBookBeReserved AddReserve GetReservesFromItemnumber CancelReserve GetReservesFromBiblionumber};
 
 use NCIP::Item::Id;
 use NCIP::Problem;
@@ -328,6 +328,81 @@ sub itemrequested {
     $response->header($self->make_header($request));
 
     # FIXME Keep track of this 
+
+    my $data = {
+        RequestType => $request->{$message}->{RequestType},
+    };
+
+    $response->data($data);
+    return $response;
+
+}
+
+=head2 renewitem
+
+    $response = $ils->renewitem($request);
+
+Handle the NCIP RenewItem message.
+
+=cut
+
+sub renewitem {
+
+    my $self = shift;
+    my $request = shift;
+    # Check our session and login if necessary:
+    # FIXME $self->login() unless ($self->checkauth());
+
+    # Common stuff:
+    my $message = $self->parse_request_type($request);
+    my $response = NCIP::Response->new({type => $message . 'Response'});
+    $response->header($self->make_header($request));
+
+    # Find the cardnumber of the borrower
+    my ( $cardnumber, $cardnumber_field ) = $self->find_user_barcode( $request );
+    unless( $cardnumber ) {
+        my $problem = NCIP::Problem->new({
+            ProblemType    => 'Needed Data Missing',
+            ProblemDetail  => 'Cannot find user barcode in message',
+            ProblemElement => $cardnumber_field,
+            ProblemValue   => 'NULL',
+        });
+        $response->problem($problem);
+        return $response;
+    }
+
+    # Find the borrower based on the cardnumber
+    my $borrower = GetMemberDetails( undef, $cardnumber );
+    if ($borrower) {
+        my $datedue = AddRenewal( $cardnumber, $borrower->{'borrowernumber'} );
+        my $data = {
+            ItemId => NCIP::Item::Id->new(
+                {
+                    AgencyId => $request->{$message}->{ItemId}->{AgencyId},
+                    ItemIdentifierType => $request->{$message}->{ItemId}->{ItemIdentifierType},
+                    ItemIdentifierValue => $request->{$message}->{ItemId}->{ItemIdentifierValue}
+                }
+            ),
+            UserId => NCIP::User::Id->new(
+                {
+                    UserIdentifierType => 'Barcode Id',
+                    UserIdentifierValue => $cardnumber,
+                }
+            ),
+            DateDue => $datedue,
+        };
+        $response->data($data);
+        return $response;
+    } else {
+        my $problem = NCIP::Problem->new({
+            ProblemType    => 'Unknown User',
+            ProblemDetail  => "User with barcode $cardnumber unknown",
+            ProblemElement => $cardnumber_field,
+            ProblemValue   => 'NULL',
+        });
+        $response->problem($problem);
+        return $response;
+    }
 
     my $data = {
         RequestType => $request->{$message}->{RequestType},
