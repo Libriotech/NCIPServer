@@ -459,4 +459,95 @@ sub renewitem {
 
 }
 
+=head2 cancelrequestitem
+
+    $response = $ils->cancelrequestitem($request);
+
+Handle the NCIP CancelRequestItem message.
+
+=cut
+
+sub cancelrequestitem {
+
+    my $self = shift;
+    my $request = shift;
+    # Check our session and login if necessary:
+    # FIXME $self->login() unless ($self->checkauth());
+
+    # Common stuff:
+    my $message = $self->parse_request_type($request);
+    my $response = NCIP::Response->new({type => $message . 'Response'});
+    $response->header($self->make_header($request));
+
+    # Find the cardnumber of the borrower
+    my ( $cardnumber, $cardnumber_field ) = $self->find_user_barcode( $request );
+    unless( $cardnumber ) {
+        my $problem = NCIP::Problem->new({
+            ProblemType    => 'Needed Data Missing',
+            ProblemDetail  => 'Cannot find user barcode in message',
+            ProblemElement => $cardnumber_field,
+            ProblemValue   => 'NULL',
+        });
+        $response->problem($problem);
+        return $response;
+    }
+
+    # Find the borrower based on the cardnumber
+    my $borrower = GetMemberDetails( undef, $cardnumber );
+    unless ( $borrower ) {
+        my $problem = NCIP::Problem->new({
+            ProblemType    => 'Unknown User',
+            ProblemDetail  => "User with barcode $cardnumber unknown",
+            ProblemElement => $cardnumber_field,
+            ProblemValue   => 'NULL',
+        });
+        $response->problem($problem);
+        return $response;
+    }
+
+    my $requestid = $request->{$message}->{RequestId}->{RequestIdentifierValue};
+    my $reserve = CancelReserve( { reserve_id => $requestid } );
+    # CancelReserve returns data about the reserve on success, undef on failure
+    # FIXME We can be more specific about the failure if we check the reserve
+    # more in depth before we do CancelReserve, e.g. with GetReserve
+    unless ( $reserve ) {
+        my $problem = NCIP::Problem->new({
+            ProblemType    => 'FIXME RequestItem can not be cancelled',
+            ProblemDetail  => "Request with id $requestid unknown",
+            ProblemElement => 'RequestIdentifierValue',
+            ProblemValue   => $requestid,
+        });
+        $response->problem($problem);
+        return $response;
+    }
+
+    # If we got this far, the request was successfully cancelled
+    my $data = {
+        RequestId => NCIP::RequestId->new(
+            {
+                AgencyId => $request->{$message}->{RequestId}->{AgencyId},
+                RequestIdentifierType => $request->{$message}->{RequestId}->{RequestIdentifierType},
+                RequestIdentifierValue => $request->{$message}->{RequestId}->{RequestIdentifierValue},
+            }
+        ),
+        UserId => NCIP::User::Id->new(
+            {
+                UserIdentifierType => 'Barcode Id',
+                UserIdentifierValue => $borrower->{'cardnumber'},
+            }
+        ),
+        ItemId => NCIP::Item::Id->new(
+            {
+                AgencyId => $request->{$message}->{ItemId}->{AgencyId},
+                ItemIdentifierType => $request->{$message}->{ItemId}->{ItemIdentifierType},
+                ItemIdentifierValue => $request->{$message}->{ItemId}->{ItemIdentifierValue},
+            }
+        ),
+    };
+
+    $response->data($data);
+    return $response;
+
+}
+
 1;
