@@ -213,7 +213,7 @@ sub lookupagency {
     my $payload = {
         fromagencyid => $request->{LookupVersion}->{ToAgencyId}->{AgencyId},
         toagencyid => $request->{LookupVersion}->{FromAgencyId}->{AgencyId},
-        applicationprofilesupportedtype => 'NNCIPP 0.1',
+        applicationprofilesupportedtype => 'NNCIPP 1.0',
     };
     $response->data($payload);
 
