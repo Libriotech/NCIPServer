@@ -19,10 +19,13 @@ package NCIP::ILS::Koha;
 use Modern::Perl;
 use Data::Dumper; # FIXME Debug
 
+use C4::Biblio;
 use C4::Circulation qw { AddRenewal CanBookBeRenewed };
 use C4::Members qw{ GetMemberDetails };
-use C4::Items qw { GetItem };
+use C4::Items qw { AddItem GetItem };
 use C4::Reserves qw {CanBookBeReserved AddReserve GetReservesFromItemnumber CancelReserve GetReservesFromBiblionumber};
+
+use Koha::ILLRequests;
 
 use NCIP::Item::Id;
 use NCIP::Problem;
@@ -327,10 +330,45 @@ sub itemrequested {
     my $response = NCIP::Response->new({type => $message . 'Response'});
     $response->header($self->make_header($request));
 
-    # FIXME Keep track of this 
+    # Get the ID of library we ordered from
+    my $ordered_from = _isil2barcode( $request->{$message}->{InitiationHeader}->{FromAgencyId}->{AgencyId} );
+
+    # Create a minimal MARC record based on ItemOptionalFields
+    my $bibdata = $request->{$message}->{ItemOptionalFields}->{BibliographicDescription};
+    my $xml = '<record>
+    <datafield tag="100" ind1=" " ind2=" ">
+        <subfield code="a">' . $bibdata->{Author} . '</subfield>
+    </datafield>
+    <datafield tag="245" ind1=" " ind2=" ">
+        <subfield code="a">' . $bibdata->{Title} . '</subfield>
+    </datafield>
+    <datafield tag="260" ind1=" " ind2=" ">
+        <subfield code="a">' . $bibdata->{PlaceOfPublication} . '</subfield>
+        <subfield code="b">' . $bibdata->{Publisher} .          '</subfield>
+        <subfield code="c">' . $bibdata->{PublicationDate} .    '</subfield>
+    </datafield>
+    </record>';
+    my $record = MARC::Record->new_from_xml( $xml, 'UTF-8' );
+    my ( $biblionumber, $biblioitemnumber ) = AddBiblio( $record, 'FA' );
+
+    # Add an item
+    my $item = {
+        'homebranch'    => 'ILL',
+        'holdingbranch' => 'ILL',
+        'itype'         => 'ILL',
+    };
+    my ( $ibiblionumber, $biblioitemnumber, $itemnumber ) = AddItem( $item, $biblionumber );
+
+    # Create a new request with the newly created biblionumber
+    my $illRequest   = Koha::ILLRequests->new;
+    my $saved_request = $illRequest->request({
+        'biblionumber' => $biblionumber,
+        'branch'       => 'ILL', # FIXME
+        'borrower'     => $ordered_from,
+    });
 
     my $data = {
-        RequestType => $request->{$message}->{RequestType},
+        RequestType => $message,
     };
 
     $response->data($data);
@@ -547,6 +585,15 @@ sub cancelrequestitem {
 
     $response->data($data);
     return $response;
+
+}
+
+# Turn NO-xxxxxxx into xxxxxxx
+sub _isil2barcode {
+
+    my ( $s ) = @_;
+    $s =~ s/^NO-//i;
+    return $s;
 
 }
 
