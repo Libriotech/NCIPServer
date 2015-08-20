@@ -357,7 +357,7 @@ sub itemrequested {
         'holdingbranch' => 'ILL',
         'itype'         => 'ILL',
     };
-    my ( $ibiblionumber, $biblioitemnumber, $itemnumber ) = AddItem( $item, $biblionumber );
+    my ( $x_biblionumber, $x_biblioitemnumber, $itemnumber ) = AddItem( $item, $biblionumber );
 
     # Create a new request with the newly created biblionumber
     my $illRequest   = Koha::ILLRequests->new;
@@ -366,6 +366,7 @@ sub itemrequested {
         'branch'       => 'ILL', # FIXME
         'borrower'     => $ordered_from,
     });
+    $saved_request->editStatus({ 'status' => 'ORDERED' });
 
     my $data = {
         RequestType => $message,
