@@ -359,12 +359,17 @@ sub itemrequested {
     };
     my ( $x_biblionumber, $x_biblioitemnumber, $itemnumber ) = AddItem( $item, $biblionumber );
 
+    # Get the borrower that the request is meant for
+    my $cardnumber = $request->{$message}->{UserId}->{UserIdentifierValue};
+    my $borrower = GetMemberDetails( undef, $cardnumber );
+
     # Create a new request with the newly created biblionumber
     my $illRequest   = Koha::ILLRequests->new;
     my $saved_request = $illRequest->request({
         'biblionumber' => $biblionumber,
         'branch'       => 'ILL', # FIXME
-        'borrower'     => $ordered_from,
+        'borrower'     => $borrower->{'borrowernumber'},
+        'ordered_from' => $ordered_from,
     });
     $saved_request->editStatus({ 'status' => 'ORDERED' });
 
