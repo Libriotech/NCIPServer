@@ -6,20 +6,20 @@
 		<ns1:ResponseHeader>
 			<!-- Home Library -->
 			<ns1:FromAgencyId>
-				<ns1:AgencyId>NO-7654321</ns1:AgencyId>
+				<ns1:AgencyId>[% data.FromAgencyId %]</ns1:AgencyId>
 			</ns1:FromAgencyId>
 			<!-- Owner Library -->
 			<ns1:ToAgencyId>
-				<ns1:AgencyId>NO-1234567</ns1:AgencyId>
+				<ns1:AgencyId>[% data.ToAgencyId %]</ns1:AgencyId>
 			</ns1:ToAgencyId>
 		</ns1:ResponseHeader>
 		<!-- Echo UserId and ItemId to inform that msg was recived and is OK -->
 		<ns1:Ext>
 			<ns1:UserId>
-				<ns1:UserIdentifierValue>N-342567</ns1:UserIdentifierValue>
+				<ns1:UserIdentifierValue>[% data.UserId %]</ns1:UserIdentifierValue>
 			</ns1:UserId>
 			<ns1:ItemId>
-				<ns1:ItemIdentifierValue>82sd23457</ns1:ItemIdentifierValue>
+				<ns1:ItemIdentifierValue>[% data.ItemId %]</ns1:ItemIdentifierValue>
 			</ns1:ItemId>
 		</ns1:Ext>
 	</ns1:ItemShippedResponse>

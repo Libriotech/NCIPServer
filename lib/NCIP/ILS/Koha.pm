@@ -374,7 +374,11 @@ sub itemrequested {
     $saved_request->editStatus({ 'status' => 'ORDERED' });
 
     my $data = {
-        RequestType => $message,
+        RequestType  => $message,
+        ToAgencyId   => $request->{$message}->{InitiationHeader}->{FromAgencyId}->{AgencyId},
+        FromAgencyId => $request->{$message}->{InitiationHeader}->{ToAgencyId}->{AgencyId},
+        UserId       => $request->{$message}->{UserId}->{UserIdentifierValue},
+        ItemId       => $request->{$message}->{ItemId}->{ItemIdentifierValue},
     };
 
     $response->data($data);
