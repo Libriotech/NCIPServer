@@ -18,8 +18,10 @@ package NCIP::ILS::Koha;
 
 use Modern::Perl;
 use Data::Dumper; # FIXME Debug
+use Dancer ':syntax';
 
 use C4::Biblio;
+use C4::Branch;
 use C4::Circulation qw { AddRenewal CanBookBeRenewed };
 use C4::Members qw{ GetMemberDetails };
 use C4::Items qw { AddItem GetItem };
@@ -67,6 +69,42 @@ sub new {
 }
 
 =head1 HANDLER METHODS
+
+=head2 lookupagency
+
+    $response = $ils->lookupagency($request);
+
+Handle the NCIP LookupAgency message.
+
+=cut
+
+sub lookupagency {
+
+    my $self = shift;
+    my $request = shift;
+    # Check our session and login if necessary:
+    # FIXME $self->login() unless ($self->checkauth());
+
+    # Common stuff:
+    my $message = $self->parse_request_type($request);
+    my $response = NCIP::Response->new({type => $message . 'Response'});
+    $response->header($self->make_header($request));
+
+    my $library = GetBranchDetail( config->{'isilmap'}->{ $request->{$message}->{InitiationHeader}->{ToAgencyId}->{AgencyId} } );
+
+    my $data = {
+        fromagencyid => $request->{$message}->{InitiationHeader}->{ToAgencyId}->{AgencyId},
+        toagencyid => $request->{$message}->{InitiationHeader}->{FromAgencyId}->{AgencyId},
+        RequestType => $request->{$message}->{RequestType},
+        library => $library,
+        orgtype => ucfirst C4::Context->preference( "UsageStatsLibraryType" ),
+        applicationprofilesupportedtype => 'NNCIPP 1.0',
+    };
+
+    $response->data($data);
+    return $response;
+
+}
 
 =head2 itemshipped
 
