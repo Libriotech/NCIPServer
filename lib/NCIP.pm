@@ -58,12 +58,13 @@ sub process_request {
 
     # Declare our response object:
     my $response;
+    my $type;
 
     # Make an object out of the XML request message:
     my $request = $self->handle_initiation($xml);
     if ($request) {
         # Get the request type from the message:
-        my $type = $self->{ils}->parse_request_type($request);
+        $type = $self->{ils}->parse_request_type($request);
         if ($type) {
             my $message = lc($type);
             if ($self->{ils}->can($message)) {
@@ -89,7 +90,13 @@ sub process_request {
         $response->problem($problem);
     }
 
-    return $self->render_output($response);
+    my $rendered_output = $self->render_output($response);
+
+    # Log the XML messages to the ILS
+    $self->{ils}->log_to_ils( $type, $xml );
+    $self->{ils}->log_to_ils( $type . 'Response', $rendered_output );
+
+    return $rendered_output;
 }
 
 =head2 handle_initiation

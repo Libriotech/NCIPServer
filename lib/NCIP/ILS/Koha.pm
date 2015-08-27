@@ -26,6 +26,7 @@ use C4::Circulation qw { AddRenewal CanBookBeRenewed };
 use C4::Members qw{ GetMemberDetails };
 use C4::Items qw { AddItem GetItem };
 use C4::Reserves qw {CanBookBeReserved AddReserve GetReservesFromItemnumber CancelReserve GetReservesFromBiblionumber};
+use C4::Log;
 
 use Koha::ILLRequests;
 
@@ -642,6 +643,22 @@ sub _isil2barcode {
     my ( $s ) = @_;
     $s =~ s/^NO-//i;
     return $s;
+
+}
+
+=head2 log_to_ils
+
+    $self->{ils}->log_to_ils( $xml );
+
+We want to keep a log of all NCIP messages in one place - in the ILS. This
+function will do that for us. 
+
+=cut
+
+sub log_to_ils {
+
+    my ( $self, $type, $xml ) = @_;
+    logaction( 'ILL', $type, undef, $xml );
 
 }
 
