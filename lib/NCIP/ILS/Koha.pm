@@ -34,6 +34,7 @@ use NCIP::Item::Id;
 use NCIP::Problem;
 use NCIP::RequestId;
 use NCIP::User::Id;
+use NCIP::Item::BibliographicDescription;
 
 # Inherit from NCIP::ILS.
 use parent qw(NCIP::ILS);
@@ -213,29 +214,32 @@ sub requestitem {
         $response->problem($problem);
         return $response;
     }
-
-    # FIXME Get rid of these? 
-    my $result;
-    my $biblionumber;
     
     my $itemdata;
     # Find the barcode from the request, if there is one
+    # FIXME Figure out if we have a barcode or RFID
+    my $itemidentifiertype  = $request->{$message}->{ItemId}->{ItemIdentifierType};
+    my $itemidentifiervalue = $request->{$message}->{ItemId}->{ItemIdentifierValue};
     my ( $barcode, $barcode_field ) = $self->find_item_barcode($request);
-    if ($barcode) {
+    if ( $itemidentifiertype eq "Barcode" && $itemidentifiervalue ne '' ) {
         # We have a barcode (or something passing itself off as a barcode), 
         # try to use it to get item data
-        $itemdata = GetItem( undef, $barcode );
-        # unless ( $itemdata ) {
-        #     my $problem = NCIP::Problem->new({
-        #         ProblemType    => 'Unknown Item',
-        #         ProblemDetail  => "Item $barcode is unknown",
-        #         ProblemElement => $barcode_field,
-        #         ProblemValue   => $barcode,
-        #     });
-        #     $response->problem($problem);
-        #     return $response;
-        # }
+        $itemdata = GetItem( undef, $itemidentifiervalue );
+        unless ( $itemdata ) {
+            my $problem = NCIP::Problem->new({
+                ProblemType    => 'Unknown Item',
+                ProblemDetail  => "Item $itemidentifiervalue is unknown",
+                ProblemElement => 'ItemIdentifierValue',
+                ProblemValue   => $itemidentifiervalue,
+            });
+            $response->problem($problem);
+            return $response;
+        }
     }
+    
+    my $bibliodata   = GetBiblioData( $itemdata->{'biblionumber'} );
+    my $lang_code = _get_langcode_from_bibliodata( $bibliodata );
+    
     
     # FIXME Deal with BibliographicId
     # else {
@@ -260,74 +264,89 @@ sub requestitem {
         return $response;
     }
 
-    # $self->userenv();
-    my $request_id;
+    # Create a new request with thees newly created biblionumber
+    my $illRequest   = Koha::ILLRequests->new;
+    my $saved_request = $illRequest->request({
+        'biblionumber' => $itemdata->{'biblionumber'},
+        'branch'       => 'ILL', # FIXME
+        'borrower'     => $borrower->{'borrowernumber'},
+    });
 
     # Check if it is possible to make a reservation
-    if ( CanBookBeReserved( $borrower->{borrowernumber}, $itemdata->{biblionumber} )) {
-        my $biblioitemnumber = $itemdata->{biblionumber};
+    # if ( CanBookBeReserved( $borrower->{borrowernumber}, $itemdata->{biblionumber} )) {
+    #     my $biblioitemnumber = $itemdata->{biblionumber};
+    #     # Add reserve here
+    #     # FIXME We should be able to place an ILL request in the ILL module as an alternative workflow
+    #     AddReserve(
+    #         $response->{'header'}->{'ToAgencyId'}->{'AgencyId'}, # branch
+    #         $borrower->{borrowernumber},                         # borrowernumber
+    #         $itemdata->{biblionumber},                           # biblionumber
+    #         'a',                                                 # constraint
+    #         [$biblioitemnumber],                                 # bibitems
+    #         1,                                                   # priority
+    #         undef,                                               # resdate
+    #         undef,                                               # expdate
+    #         'Placed By ILL',                                     # notes
+    #         '',                                                  # title
+    #         $itemdata->{'itemnumber'} || undef,                  # checkitem
+    #         undef,                                               # found
+    #     );
+    #     if ($biblionumber) {
+    #         my $reserves = GetReservesFromBiblionumber({
+    #             biblionumber => $itemdata->{biblionumber}
+    #         });
+    #         $request_id = $reserves->[1]->{reserve_id};
+    #     } else {
+    #         my ( $reservedate, $borrowernumber, $branchcode2, $reserve_id,
+    #             $wait )
+    #           = GetReservesFromItemnumber( $itemdata->{'itemnumber'} );
+    #         $request_id = $reserve_id;
+    #     }
+    # } else {
+    #     # A reservation can not be made
+    #     my $problem = NCIP::Problem->new({
+    #         ProblemType        => 'Item Does Not Circulate',
+    #             ProblemDetail  => 'Request of Item cannot proceed because the Item is non-circulating',
+    #             ProblemElement => 'BibliographicRecordIdentifier',
+    #             ProblemValue   => 'NULL',
+    #     });
+    #     $response->problem($problem);
+    #     return $response;
+    # }
 
-        # Add reserve here
-        # FIXME We should be able to place an ILL request in the ILL module as an alternative workflow
-        AddReserve(
-            $response->{'header'}->{'ToAgencyId'}->{'AgencyId'}, # branch
-            $borrower->{borrowernumber},                         # borrowernumber
-            $itemdata->{biblionumber},                           # biblionumber
-            'a',                                                 # constraint
-            [$biblioitemnumber],                                 # bibitems
-            1,                                                   # priority
-            undef,                                               # resdate
-            undef,                                               # expdate
-            'Placed By ILL',                                     # notes
-            '',                                                  # title
-            $itemdata->{'itemnumber'} || undef,                  # checkitem
-            undef,                                               # found
-        );
-        if ($biblionumber) {
-            my $reserves = GetReservesFromBiblionumber({
-                biblionumber => $itemdata->{biblionumber}
-            });
-            $request_id = $reserves->[1]->{reserve_id};
-        } else {
-            my ( $reservedate, $borrowernumber, $branchcode2, $reserve_id,
-                $wait )
-              = GetReservesFromItemnumber( $itemdata->{'itemnumber'} );
-            $request_id = $reserve_id;
-        }
-    } else {
-        # A reservation can not be made
-        my $problem = NCIP::Problem->new({
-            ProblemType        => 'Item Does Not Circulate',
-                ProblemDetail  => 'Request of Item cannot proceed because the Item is non-circulating',
-                ProblemElement => 'BibliographicRecordIdentifier',
-                ProblemValue   => 'NULL',
-        });
-        $response->problem($problem);
-        return $response;
-
-    }
-
-    # Build the response    
+    # Build the response
     my $data = {
+        ToAgencyId   => $request->{$message}->{InitiationHeader}->{FromAgencyId}->{AgencyId},
+        FromAgencyId => $request->{$message}->{InitiationHeader}->{ToAgencyId}->{AgencyId},
         RequestId => NCIP::RequestId->new({
-            # FIXME Check if one was provided in $request->{$message}->{RequestId}
-            RequestIdentifierValue => $request_id # the id of the reserve we added
+            # Echo back the RequestIdentifier found in the request
+            AgencyId => $request->{$message}->{RequestId}->{AgencyId},
+            RequestIdentifierValue => $request->{$message}->{RequestId}->{RequestIdentifierValue},
         }),
         ItemId => NCIP::Item::Id->new(
             {
-                AgencyId => 'FIXME', # $selection_ou->shortname(),
-                ItemIdentifierValue => 'FIXME', # $bre->id(),
-                ItemIdentifierType => 'SYSNUMBER'
+                ItemIdentifierValue => $itemidentifiervalue,
+                ItemIdentifierType => $itemidentifiertype,
             }
         ),
         UserId => NCIP::User::Id->new(
             {
                 UserIdentifierValue => $borrower->{'cardnumber'},
-                UserIdentifierType => 'Barcode Id'
             }
         ),
         RequestType => $request->{$message}->{RequestType},
-        RequestScopeType => 'TRUE', # FIXME
+        ItemOptionalFields => NCIP::Item::BibliographicDescription->new(
+            {
+                Author             => $bibliodata->{'author'},
+                PlaceOfPublication => $bibliodata->{'place'},
+                PublicationDate    => $bibliodata->{'copyrightdate'},
+                Publisher          => $bibliodata->{'publishercode'},
+                Title              => $bibliodata->{'title'},
+                BibliographicLevel => 'Book', # FIXME
+                Language           => $lang_code,
+                MediumType         => 'Book', # FIXME
+            }
+        ),
     };
 
         # Look for UserElements requested and add it to the response:
@@ -643,6 +662,27 @@ sub _isil2barcode {
     my ( $s ) = @_;
     $s =~ s/^NO-//i;
     return $s;
+
+}
+
+=head2 _get_langcode_from_bibliodata 
+
+Take a record and pick ut the language code in controlfield 008, position 35-37.
+
+=cut
+
+sub _get_langcode_from_bibliodata {
+
+    my ( $bibliodata ) = @_;
+
+    my $marcxml = $bibliodata->{'marcxml'};
+    my $record = MARC::Record->new_from_xml( $marcxml, 'UTF-8' );
+    my $f008 = $record->field( '008' )->data();
+    my $lang_code = '   ';
+    if ( $f008 ) {
+        $lang_code = substr $f008, 35, 3;
+    }
+    return $lang_code;
 
 }
 
