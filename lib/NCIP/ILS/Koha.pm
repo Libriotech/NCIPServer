@@ -190,30 +190,30 @@ sub requestitem {
     $response->header($self->make_header($request));
 
     # Find the cardnumber of the borrower
-    my ( $cardnumber, $cardnumber_field ) = $self->find_user_barcode( $request );
-    unless( $cardnumber ) {
-        my $problem = NCIP::Problem->new({
-            ProblemType    => 'Needed Data Missing',
-            ProblemDetail  => 'Cannot find user barcode in message',
-            ProblemElement => $cardnumber_field,
-            ProblemValue   => 'NULL',
-        });
-        $response->problem($problem);
-        return $response;
-    }
+    # my ( $cardnumber, $cardnumber_field ) = $self->find_user_barcode( $request );
+    # unless( $cardnumber ) {
+    #     my $problem = NCIP::Problem->new({
+    #         ProblemType    => 'Needed Data Missing',
+    #         ProblemDetail  => 'Cannot find user barcode in message',
+    #         ProblemElement => $cardnumber_field,
+    #         ProblemValue   => 'NULL',
+    #     });
+    #     $response->problem($problem);
+    #     return $response;
+    # }
 
     # Find the borrower based on the cardnumber
-    my $borrower = GetMemberDetails( undef, $cardnumber );
-    unless ($borrower) {
-        my $problem = NCIP::Problem->new({
-            ProblemType    => 'Unknown User',
-            ProblemDetail  => "User with barcode $cardnumber unknown",
-            ProblemElement => $cardnumber_field,
-            ProblemValue   => 'NULL',
-        });
-        $response->problem($problem);
-        return $response;
-    }
+    # my $borrower = GetMemberDetails( undef, $cardnumber );
+    # unless ($borrower) {
+    #     my $problem = NCIP::Problem->new({
+    #         ProblemType    => 'Unknown User',
+    #         ProblemDetail  => "User with barcode $cardnumber unknown",
+    #         ProblemElement => $cardnumber_field,
+    #         ProblemValue   => 'NULL',
+    #     });
+    #     $response->problem($problem);
+    #     return $response;
+    # }
     
     my $itemdata;
     # Find the barcode from the request, if there is one
@@ -330,7 +330,7 @@ sub requestitem {
         ),
         UserId => NCIP::User::Id->new(
             {
-                UserIdentifierValue => $borrower->{'cardnumber'},
+                UserIdentifierValue => $request->{$message}->{UserId}->{UserIdentifierValue},
             }
         ),
         RequestType => $request->{$message}->{RequestType},
