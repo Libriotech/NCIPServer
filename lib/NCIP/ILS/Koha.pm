@@ -269,7 +269,6 @@ sub requestitem {
     my $saved_request = $illRequest->request({
         'biblionumber' => $itemdata->{'biblionumber'},
         'branch'       => 'ILL', # FIXME
-        'borrower'     => $borrower->{'borrowernumber'},
     });
 
     # Check if it is possible to make a reservation
