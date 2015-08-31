@@ -209,7 +209,7 @@ sub requestitem {
         my $problem = NCIP::Problem->new({
             ProblemType    => 'Unknown User',
             ProblemDetail  => "User with barcode $cardnumber unknown",
-            ProblemElement => $cardnumber_field,
+            ProblemElement => 'AgencyId',
             ProblemValue   => 'NULL',
         });
         $response->problem( $problem );
