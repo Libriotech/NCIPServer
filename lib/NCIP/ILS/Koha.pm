@@ -203,7 +203,7 @@ sub requestitem {
     # }
 
     # Find the library borrower based on the cardnumber
-    my $cardnumber = _isil2barcode $request->{$message}->{InitiationHeader}->{FromAgencyId}->{AgencyId};
+    my $cardnumber = _isil2barcode( $request->{$message}->{InitiationHeader}->{FromAgencyId}->{AgencyId} );
     my $borrower = GetMemberDetails( undef, $cardnumber );
     unless ( $borrower ) {
         my $problem = NCIP::Problem->new({
