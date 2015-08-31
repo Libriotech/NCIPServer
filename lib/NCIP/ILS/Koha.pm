@@ -268,9 +268,9 @@ sub requestitem {
     # Create a new request with thees newly created biblionumber
     my $illRequest   = Koha::ILLRequests->new;
     my $saved_request = $illRequest->request({
-        'biblionumber'   => $itemdata->{'biblionumber'},
-        'branch'         => 'ILL', # FIXME
-        'borrowernumber' => $borrower->{'borrowernumber'}
+        'biblionumber' => $itemdata->{'biblionumber'},
+        'branch'       => 'ILL', # FIXME
+        'borrower'     => $borrower->{'borrowernumber'}
     });
 
     # Check if it is possible to make a reservation
