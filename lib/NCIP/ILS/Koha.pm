@@ -272,7 +272,7 @@ sub requestitem {
         'branch'       => 'ILL', # FIXME
         'borrower'     => $borrower->{'borrowernumber'}, # Home Library
     });
-    $request->editStatus({ 'remote_id' => $request->{$message}->{RequestId}->{RequestIdentifierValue} });
+    $saved_request->editStatus({ 'remote_id' => $request->{$message}->{RequestId}->{RequestIdentifierValue} });
 
     # Check if it is possible to make a reservation
     # if ( CanBookBeReserved( $borrower->{borrowernumber}, $itemdata->{biblionumber} )) {
