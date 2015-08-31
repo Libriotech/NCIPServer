@@ -202,7 +202,7 @@ sub requestitem {
     #     return $response;
     # }
 
-    # Find the library borrower based on the cardnumber
+    # Find the library (borrower) based on the FromAgencyId
     my $cardnumber = _isil2barcode( $request->{$message}->{InitiationHeader}->{FromAgencyId}->{AgencyId} );
     my $borrower = GetMemberDetails( undef, $cardnumber );
     unless ( $borrower ) {
@@ -265,13 +265,14 @@ sub requestitem {
         return $response;
     }
 
-    # Create a new request with thees newly created biblionumber
+    # Create a new request with the newly created biblionumber
     my $illRequest   = Koha::ILLRequests->new;
     my $saved_request = $illRequest->request({
         'biblionumber' => $itemdata->{'biblionumber'},
         'branch'       => 'ILL', # FIXME
-        'borrower'     => $borrower->{'borrowernumber'}
+        'borrower'     => $borrower->{'borrowernumber'}, # Home Library
     });
+    $request->editStatus({ 'remote_id' => $request->{$message}->{RequestId}->{RequestIdentifierValue} });
 
     # Check if it is possible to make a reservation
     # if ( CanBookBeReserved( $borrower->{borrowernumber}, $itemdata->{biblionumber} )) {
