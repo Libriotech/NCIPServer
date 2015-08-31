@@ -202,18 +202,19 @@ sub requestitem {
     #     return $response;
     # }
 
-    # Find the borrower based on the cardnumber
-    # my $borrower = GetMemberDetails( undef, $cardnumber );
-    # unless ($borrower) {
-    #     my $problem = NCIP::Problem->new({
-    #         ProblemType    => 'Unknown User',
-    #         ProblemDetail  => "User with barcode $cardnumber unknown",
-    #         ProblemElement => $cardnumber_field,
-    #         ProblemValue   => 'NULL',
-    #     });
-    #     $response->problem($problem);
-    #     return $response;
-    # }
+    # Find the library borrower based on the cardnumber
+    my $cardnumber = _isil2barcode $request->{$message}->{InitiationHeader}->{FromAgencyId}->{AgencyId};
+    my $borrower = GetMemberDetails( undef, $cardnumber );
+    unless ( $borrower ) {
+        my $problem = NCIP::Problem->new({
+            ProblemType    => 'Unknown User',
+            ProblemDetail  => "User with barcode $cardnumber unknown",
+            ProblemElement => $cardnumber_field,
+            ProblemValue   => 'NULL',
+        });
+        $response->problem( $problem );
+        return $response;
+    }
     
     my $itemdata;
     # Find the barcode from the request, if there is one
@@ -267,8 +268,9 @@ sub requestitem {
     # Create a new request with thees newly created biblionumber
     my $illRequest   = Koha::ILLRequests->new;
     my $saved_request = $illRequest->request({
-        'biblionumber' => $itemdata->{'biblionumber'},
-        'branch'       => 'ILL', # FIXME
+        'biblionumber'   => $itemdata->{'biblionumber'},
+        'branch'         => 'ILL', # FIXME
+        'borrowernumber' => $borrower->{'borrowernumber'}
     });
 
     # Check if it is possible to make a reservation
