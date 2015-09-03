@@ -128,10 +128,26 @@ sub itemshipped {
     my $response = NCIP::Response->new({type => $message . 'Response'});
     $response->header($self->make_header($request));
     
-    # FIXME Keep track of this 
+    # FIXME Change the status of the request
+    # Find the request
+    my $illRequests = Koha::ILLRequests->new;
+    my $saved_requests = $illRequests->search({
+        # This is a request we have sent out ourselves, so we can use the value
+        # of RequestIdentifierValue directly against the id column
+        'id' => $request->{$message}->{RequestId}->{RequestIdentifierValue},
+    });
+    # There should only be one request, so we use the zero'th one
+    my $saved_request = $saved_requests->[0];
+    $saved_request->editStatus({ 'status' => 'SHIPPING' });
+
+    # FIXME Update the bibliographic data if new data is sent
     
     my $data = {
-        RequestType => $request->{$message}->{RequestType},
+        fromagencyid           => $request->{$message}->{InitiationHeader}->{ToAgencyId}->{AgencyId},
+        toagencyid             => $request->{$message}->{InitiationHeader}->{FromAgencyId}->{AgencyId},
+        AgencyId               => $request->{$message}->{RequestId}->{AgencyId},
+        RequestIdentifierValue => $request->{$message}->{RequestId}->{RequestIdentifierValue},
+        RequestType            => $request->{$message}->{RequestType},
     };
 
     $response->data($data);
@@ -272,7 +288,11 @@ sub requestitem {
         'branch'       => 'ILL', # FIXME
         'borrower'     => $borrower->{'borrowernumber'}, # Home Library
     });
-    $saved_request->editStatus({ 'remote_id' => $request->{$message}->{RequestId}->{RequestIdentifierValue} });
+    warn "*** remote user: " . $request->{$message}->{UserId}->{UserIdentifierValue};
+    $saved_request->editStatus({
+        'remote_user' => $request->{$message}->{UserId}->{UserIdentifierValue},
+        'remote_id'   => $request->{$message}->{RequestId}->{AgencyId} . ':' . $request->{$message}->{RequestId}->{RequestIdentifierValue},
+    });
 
     # Check if it is possible to make a reservation
     # if ( CanBookBeReserved( $borrower->{borrowernumber}, $itemdata->{biblionumber} )) {
