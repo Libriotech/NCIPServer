@@ -5,7 +5,7 @@
 <ns1:ProblemType>
 [% END -%]
 [%- problem.ProblemType | xml %]</ns1:ProblemType>
-<ns1:ProblemDetail>[% problem.ProblemDetail | xml %]</ns1:ProblemDetail>
-<ns1:ProblemElement>[% problem.ProblemElement | xml %]</ns1:ProblemElement>
-<ns1:ProblemValue>[% problem.ProblemValue | xml %]</ns1:ProblemValue>
+[% IF problem.ProblemDetail  %]<ns1:ProblemDetail>[%  problem.ProblemDetail  | xml %]</ns1:ProblemDetail>[% END %]
+[% IF problem.ProblemElement %]<ns1:ProblemElement>[% problem.ProblemElement | xml %]</ns1:ProblemElement>[% END %]
+[% IF problem.ProblemValue   %]<ns1:ProblemValue>[%   problem.ProblemValue   | xml %]</ns1:ProblemValue>[% END %]
 </ns1:Problem>
