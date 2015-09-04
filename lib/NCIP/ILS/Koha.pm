@@ -22,7 +22,7 @@ use Dancer ':syntax';
 
 use C4::Biblio;
 use C4::Branch;
-use C4::Circulation qw { AddRenewal CanBookBeRenewed };
+use C4::Circulation qw { AddRenewal CanBookBeRenewed GetRenewCount };
 use C4::Members qw{ GetMemberDetails };
 use C4::Items qw { AddItem GetItem };
 use C4::Reserves qw {CanBookBeReserved AddReserve GetReservesFromItemnumber CancelReserve GetReservesFromBiblionumber};
@@ -128,7 +128,7 @@ sub itemshipped {
     my $response = NCIP::Response->new({type => $message . 'Response'});
     $response->header($self->make_header($request));
     
-    # FIXME Change the status of the request
+    # Change the status of the request
     # Find the request
     my $illRequests = Koha::ILLRequests->new;
     my $saved_requests = $illRequests->search({
@@ -139,6 +139,7 @@ sub itemshipped {
     # There should only be one request, so we use the zero'th one
     my $saved_request = $saved_requests->[0];
     $saved_request->editStatus({ 'status' => 'SHIPPING' });
+    $saved_request->editStatus({ 'remote_barcode' => $request->{$message}->{ItemId}->{ItemIdentifierValue} });
 
     # FIXME Update the bibliographic data if new data is sent
     
@@ -179,9 +180,8 @@ sub itemreceived {
     # Find the request
     my $illRequests = Koha::ILLRequests->new;
     my $saved_requests = $illRequests->search({
-        # This is a request we have sent out ourselves, so we can use the value
-        # of RequestIdentifierValue directly against the id column
-        'id' => $request->{$message}->{RequestId}->{RequestIdentifierValue},
+        'status'    => 'SHIPPED',
+        'remote_id' => $request->{$message}->{RequestId}->{AgencyId} . ':' . $request->{$message}->{RequestId}->{RequestIdentifierValue},
     });
     # There should only be one request, so we use the zero'th one
     my $saved_request = $saved_requests->[0];
@@ -549,10 +549,10 @@ sub renewitem {
     my ($ok,$error) = CanBookBeRenewed( $borrower->{'borrowernumber'}, $itemdata->{'itemnumber'} );
     unless ( $ok ) {
         my $problem = NCIP::Problem->new({
-            ProblemType    => 'FIXME Can not be renewed',
-            ProblemDetail  => $error,
-            ProblemElement => 'FIXME',
-            ProblemValue   => 'FIXME',
+            ProblemType    => 'Item Not Renewable',
+            ProblemDetail  => 'Item may not be renewed',
+            # ProblemElement => 'FIXME',
+            # ProblemValue   => 'FIXME',
         });
         $response->problem($problem);
         return $response;
@@ -561,13 +561,25 @@ sub renewitem {
     # Do the actual renewal
     my $datedue = AddRenewal( $borrower->{'borrowernumber'}, $itemdata->{'itemnumber'} );
     if ( $datedue ) {
-        # The renewal was successfull
+        # The renewal was successfull, change the status of the request
+        # Find the request
+        my $illRequests = Koha::ILLRequests->new;
+        my $saved_requests = $illRequests->search({
+            'status'         => 'RECEIVED',
+            'remote_barcode' => $request->{$message}->{ItemId}->{ItemIdentifierValue},
+        });
+        # There should only be one request, so we use the zero'th one
+        my $saved_request = $saved_requests->[0];
+        $saved_request->editStatus({ 'status' => 'RENEWED' });
+        # Check the number of remaning renewals
+        my ( $renewcount, $renewsallowed, $renewsleft ) = GetRenewCount( $borrower->{'borrowernumber'}, $itemdata->{'itemnumber'} );
+        # Send the response
         my $data = {
             ItemId => NCIP::Item::Id->new(
                 {
                     AgencyId => $request->{$message}->{ItemId}->{AgencyId},
                     ItemIdentifierType => $request->{$message}->{ItemId}->{ItemIdentifierType},
-                    ItemIdentifierValue => $request->{$message}->{ItemId}->{ItemIdentifierValue}
+                    ItemIdentifierValue => $request->{$message}->{ItemId}->{ItemIdentifierValue},
                 }
             ),
             UserId => NCIP::User::Id->new(
@@ -576,28 +588,24 @@ sub renewitem {
                     UserIdentifierValue => $cardnumber,
                 }
             ),
-            DateDue => $datedue,
+            DateDue      => $datedue,
+            fromagencyid => $request->{$message}->{InitiationHeader}->{ToAgencyId}->{AgencyId},
+            toagencyid   => $request->{$message}->{InitiationHeader}->{FromAgencyId}->{AgencyId},
+            diag         => "renewals: $renewcount, renewals allowed: $renewsallowed, renewals left: $renewsleft",
         };
         $response->data($data);
         return $response;
     } else {
         # The renewal failed
         my $problem = NCIP::Problem->new({
-            ProblemType    => 'FIXME Loan not renewed',
-            ProblemDetail  => 'FIXME',
-            ProblemElement => 'FIXME',
-            ProblemValue   => 'FIXME',
+            ProblemType    => 'Item Not Renewable',
+            ProblemDetail  => 'Item may not be renewed',
+            # ProblemElement => 'FIXME',
+            # ProblemValue   => 'FIXME',
         });
         $response->problem($problem);
         return $response;
     }
-
-    my $data = {
-        RequestType => $request->{$message}->{RequestType},
-    };
-
-    $response->data($data);
-    return $response;
 
 }
 
