@@ -306,6 +306,7 @@ sub requestitem {
         'remote_user'    => $request->{$message}->{UserId}->{UserIdentifierValue},
         'remote_id'      => $request->{$message}->{RequestId}->{AgencyId} . ':' . $request->{$message}->{RequestId}->{RequestIdentifierValue},
         'remote_barcode' => $request->{$message}->{ItemId}->{ItemIdentifierValue},
+        'reqtype'        => $request->{$message}->{RequestType},
     });
 
     # Check if it is possible to make a reservation
@@ -630,73 +631,177 @@ sub cancelrequestitem {
     $response->header($self->make_header($request));
 
     # Find the cardnumber of the borrower
-    my ( $cardnumber, $cardnumber_field ) = $self->find_user_barcode( $request );
-    unless( $cardnumber ) {
-        my $problem = NCIP::Problem->new({
-            ProblemType    => 'Needed Data Missing',
-            ProblemDetail  => 'Cannot find user barcode in message',
-            ProblemElement => $cardnumber_field,
-            ProblemValue   => 'NULL',
-        });
-        $response->problem($problem);
-        return $response;
-    }
+    # my ( $cardnumber, $cardnumber_field ) = $self->find_user_barcode( $request );
+    # unless( $cardnumber ) {
+    #     my $problem = NCIP::Problem->new({
+    #         ProblemType    => 'Needed Data Missing',
+    #         ProblemDetail  => 'Cannot find user barcode in message',
+    #         ProblemElement => $cardnumber_field,
+    #         ProblemValue   => 'NULL',
+    #     });
+    #     $response->problem($problem);
+    #     return $response;
+    # }
 
     # Find the borrower based on the cardnumber
-    my $borrower = GetMemberDetails( undef, $cardnumber );
-    unless ( $borrower ) {
-        my $problem = NCIP::Problem->new({
-            ProblemType    => 'Unknown User',
-            ProblemDetail  => "User with barcode $cardnumber unknown",
-            ProblemElement => $cardnumber_field,
-            ProblemValue   => 'NULL',
-        });
-        $response->problem($problem);
-        return $response;
-    }
+    # my $borrower = GetMemberDetails( undef, $cardnumber );
+    # unless ( $borrower ) {
+    #     my $problem = NCIP::Problem->new({
+    #         ProblemType    => 'Unknown User',
+    #         ProblemDetail  => "User with barcode $cardnumber unknown",
+    #         ProblemElement => $cardnumber_field,
+    #         ProblemValue   => 'NULL',
+    #     });
+    #     $response->problem($problem);
+    #     return $response;
+    # }
 
-    my $requestid = $request->{$message}->{RequestId}->{RequestIdentifierValue};
-    my $reserve = CancelReserve( { reserve_id => $requestid } );
+    # my $reserve = CancelReserve( { reserve_id => $requestid } );
     # CancelReserve returns data about the reserve on success, undef on failure
     # FIXME We can be more specific about the failure if we check the reserve
     # more in depth before we do CancelReserve, e.g. with GetReserve
-    unless ( $reserve ) {
-        my $problem = NCIP::Problem->new({
-            ProblemType    => 'FIXME RequestItem can not be cancelled',
-            ProblemDetail  => "Request with id $requestid unknown",
-            ProblemElement => 'RequestIdentifierValue',
-            ProblemValue   => $requestid,
+
+    # We need to figure out if this is the home library cancelling a request it
+    # has sent out, or an owner library rejecting a request it has received
+    if ( $request->{$message}->{Ext}->{NoticeContent} eq 'CancelledBy.Borrower' ) {
+
+        # The request is being cancelled (withdrawn) by the home library
+
+        my $remote_id = $request->{$message}->{RequestId}->{AgencyId} . ':' . $request->{$message}->{RequestId}->{RequestIdentifierValue};
+        my $illRequests = Koha::ILLRequests->new;
+        my $saved_requests = $illRequests->search({
+            'remote_id' => $remote_id,
         });
-        $response->problem($problem);
+        # There should only be one request, so we use the zero'th one
+        my $saved_request = $saved_requests->[0];
+        unless ( $saved_request ) {
+            my $problem = NCIP::Problem->new({
+                ProblemType    => 'RequestItem can not be cancelled',
+                ProblemDetail  => "Request with id $remote_id unknown",
+                ProblemElement => 'RequestIdentifierValue',
+                ProblemValue   => $remote_id,
+            });
+            $response->problem($problem);
+            return $response;
+        }
+
+        # Now we check if the request has already been processed or not
+        my $data;
+        if ( $saved_request->status->getProperty('status') eq 'NEW' ) {
+
+            # Request CAN be cancelled
+            $saved_request->editStatus({ 'status' => 'CANCELLED' });
+            $data = {
+                RequestId => NCIP::RequestId->new(
+                    {
+                        AgencyId => $request->{$message}->{RequestId}->{AgencyId},
+                        RequestIdentifierValue => $request->{$message}->{RequestId}->{RequestIdentifierValue},
+                    }
+                ),
+                UserId => NCIP::User::Id->new(
+                    {
+                        UserIdentifierValue => $borrower->{'cardnumber'},
+                    }
+                ),
+                ItemId => NCIP::Item::Id->new(
+                    {
+                        ItemIdentifierType => $request->{$message}->{ItemId}->{ItemIdentifierType},
+                        ItemIdentifierValue => $request->{$message}->{ItemId}->{ItemIdentifierValue},
+                    }
+                ),
+                fromagencyid => $request->{$message}->{InitiationHeader}->{ToAgencyId}->{AgencyId},
+                toagencyid   => $request->{$message}->{InitiationHeader}->{FromAgencyId}->{AgencyId},
+            };
+
+        } else {
+
+            # Request can NOT be cancelled
+            $data = {
+                Problem => NCIP::Problem->new(
+                    {
+                        ProblemType   => 'Request Already Processed',
+                        ProblemDetail => 'Request cannot be cancelled because it has already been processed.'
+                    }
+                ),
+                RequestId => NCIP::RequestId->new(
+                    {
+                        AgencyId => $request->{$message}->{RequestId}->{AgencyId},
+                        RequestIdentifierValue => $request->{$message}->{RequestId}->{RequestIdentifierValue},
+                    }
+                ),
+                UserId => NCIP::User::Id->new(
+                    {
+                        UserIdentifierValue => $borrower->{'cardnumber'},
+                    }
+                ),
+                ItemId => NCIP::Item::Id->new(
+                    {
+                        ItemIdentifierType  => $request->{$message}->{ItemId}->{ItemIdentifierType},
+                        ItemIdentifierValue => $request->{$message}->{ItemId}->{ItemIdentifierValue},
+                    }
+                ),
+                fromagencyid => $request->{$message}->{InitiationHeader}->{ToAgencyId}->{AgencyId},
+                toagencyid   => $request->{$message}->{InitiationHeader}->{FromAgencyId}->{AgencyId},
+            };
+
+        }
+
+        # If we got this far, the request was successfully cancelled
+
+        $response->data($data);
         return $response;
+
+    } else {
+
+        # The request is being rejected by the owner library
+
+        my $local_id = $request->{$message}->{RequestId}->{RequestIdentifierValue};
+        debug "*** local_id: $local_id";
+        my $illRequests = Koha::ILLRequests->new;
+        my $saved_requests = $illRequests->search({
+            'id' => $local_id,
+        });
+        debug "*** count: " . scalar @{ $saved_requests };
+        # There should only be one request, so we use the zero'th one
+        my $saved_request = $saved_requests->[0];
+        unless ( $saved_request ) {
+            my $problem = NCIP::Problem->new({
+                ProblemType    => 'RequestItem can not be cancelled',
+                ProblemDetail  => "Request with id $local_id unknown",
+                ProblemElement => 'RequestIdentifierValue',
+                ProblemValue   => $local_id,
+            });
+            $response->problem($problem);
+            return $response;
+        }
+
+        $saved_request->editStatus({ 'status' => 'REJECTED' });
+        my $data = {
+            RequestId => NCIP::RequestId->new(
+                {
+                    AgencyId => $request->{$message}->{RequestId}->{AgencyId},
+                    RequestIdentifierValue => $request->{$message}->{RequestId}->{RequestIdentifierValue},
+                }
+            ),
+            UserId => NCIP::User::Id->new(
+                {
+                    UserIdentifierValue => $request->{$message}->{UserId}->{UserIdentifierValue},
+                }
+            ),
+            ItemId => NCIP::Item::Id->new(
+                {
+                    ItemIdentifierType => $request->{$message}->{ItemId}->{ItemIdentifierType},
+                    ItemIdentifierValue => $request->{$message}->{ItemId}->{ItemIdentifierValue},
+                }
+            ),
+            fromagencyid => $request->{$message}->{InitiationHeader}->{ToAgencyId}->{AgencyId},
+            toagencyid   => $request->{$message}->{InitiationHeader}->{FromAgencyId}->{AgencyId},
+        };
+
+        $response->data($data);
+        return $response;
+
     }
-
-    # If we got this far, the request was successfully cancelled
-    my $data = {
-        RequestId => NCIP::RequestId->new(
-            {
-                AgencyId => $request->{$message}->{RequestId}->{AgencyId},
-                RequestIdentifierType => $request->{$message}->{RequestId}->{RequestIdentifierType},
-                RequestIdentifierValue => $request->{$message}->{RequestId}->{RequestIdentifierValue},
-            }
-        ),
-        UserId => NCIP::User::Id->new(
-            {
-                UserIdentifierType => 'Barcode Id',
-                UserIdentifierValue => $borrower->{'cardnumber'},
-            }
-        ),
-        ItemId => NCIP::Item::Id->new(
-            {
-                AgencyId => $request->{$message}->{ItemId}->{AgencyId},
-                ItemIdentifierType => $request->{$message}->{ItemId}->{ItemIdentifierType},
-                ItemIdentifierValue => $request->{$message}->{ItemId}->{ItemIdentifierValue},
-            }
-        ),
-    };
-
-    $response->data($data);
-    return $response;
 
 }
 
