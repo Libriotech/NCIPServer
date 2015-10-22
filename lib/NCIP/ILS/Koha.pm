@@ -304,7 +304,7 @@ sub requestitem {
     });
     $saved_request->editStatus({
         'remote_user'    => $request->{$message}->{UserId}->{UserIdentifierValue},
-        'remote_id'      => $request->{$message}->{RequestId}->{AgencyId} . ':' . $request->{$message}->{RequestId}->{RequestIdentifierValue},
+        'remote_id'      => 'NO-' . $request->{$message}->{RequestId}->{AgencyId} . ':' . $request->{$message}->{RequestId}->{RequestIdentifierValue},
         'remote_barcode' => $request->{$message}->{ItemId}->{ItemIdentifierValue},
         'reqtype'        => $request->{$message}->{RequestType},
     });
