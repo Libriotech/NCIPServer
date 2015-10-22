@@ -134,7 +134,7 @@ sub itemshipped {
     my $saved_requests = $illRequests->search({
         # This is a request we have sent out ourselves, so we can use the value
         # of RequestIdentifierValue directly against the id column
-        'id' => $request->{$message}->{RequestId}->{RequestIdentifierValue},
+        'remote_id' => $request->{$message}->{RequestId}->{AgencyId} . ':' . $request->{$message}->{RequestId}->{RequestIdentifierValue},
     });
     # There should only be one request, so we use the zero'th one
     my $saved_request = $saved_requests->[0];
