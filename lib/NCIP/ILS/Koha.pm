@@ -273,9 +273,8 @@ sub requestitem {
             return $response;
         }
         $biblionumber = $itemdata->{'biblionumber'};
-    } elsif ( $itemidentifiervalue ne '' && $itemidentifiertype eq "ISBN" ) {
-        # We have an ISBN
-        $biblionumber = _get_biblionumber_from_standardnumber( 'isbn', $itemidentifiervalue );
+    } elsif ( $itemidentifiervalue ne '' && ( $itemidentifiertype eq "ISBN" || $itemidentifiertype eq "ISSN" || $itemidentifiertype eq "EAN" ) ) {
+        $biblionumber = _get_biblionumber_from_standardnumber( lc( $itemidentifiertype ), $itemidentifiervalue );
         unless ( $biblionumber ) {
             my $problem = NCIP::Problem->new({
                 ProblemType    => 'Unknown Item',
