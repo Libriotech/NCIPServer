@@ -48,7 +48,7 @@
 			<!-- BibliographicDescription is used to describe the ItemId -->
 			<ns1:BibliographicDescription>
 				<!-- The following elements is mandatory, populate the elements according to MARC21 codes -->
-				<ns1:Author>[% data.ItemOptionalFields.Author %]</ns1:Author>
+				<ns1:Author>[% data.ItemOptionalFields.Author | xml %]</ns1:Author>
 				<ns1:PlaceOfPublication>[% data.ItemOptionalFields.PlaceOfPublication %]</ns1:PlaceOfPublication>
 				<ns1:PublicationDate>[% data.ItemOptionalFields.PublicationDate %]</ns1:PublicationDate>
 				<ns1:Publisher>[% data.ItemOptionalFields.Publisher %]</ns1:Publisher>

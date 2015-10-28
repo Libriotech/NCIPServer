@@ -114,6 +114,8 @@ sub lookupagency {
 
 Handle the NCIP ItemShipped message.
 
+Set status = SHIPPING.
+
 =cut
 
 sub itemshipped {
@@ -162,6 +164,8 @@ sub itemshipped {
 
 Handle the NCIP ItemReceived message.
 
+Set status = RECEIVED.
+
 =cut
 
 sub itemreceived {
@@ -206,6 +210,8 @@ sub itemreceived {
 
 Handle the NCIP RequestItem message.
 
+Set status = ???
+
 =cut
 
 sub requestitem {
@@ -246,16 +252,16 @@ sub requestitem {
         return $response;
     }
     
-    my $itemdata;
+    my $biblionumber;
     # Find the barcode from the request, if there is one
     # FIXME Figure out if we have a barcode or RFID
     my $itemidentifiertype  = $request->{$message}->{ItemId}->{ItemIdentifierType};
     my $itemidentifiervalue = $request->{$message}->{ItemId}->{ItemIdentifierValue};
     my ( $barcode, $barcode_field ) = $self->find_item_barcode($request);
-    if ( $itemidentifiertype eq "Barcode" && $itemidentifiervalue ne '' ) {
+    if ( $itemidentifiervalue ne '' && $itemidentifiertype eq "Barcode" ) {
         # We have a barcode (or something passing itself off as a barcode), 
         # try to use it to get item data
-        $itemdata = GetItem( undef, $itemidentifiervalue );
+        my $itemdata = GetItem( undef, $itemidentifiervalue );
         unless ( $itemdata ) {
             my $problem = NCIP::Problem->new({
                 ProblemType    => 'Unknown Item',
@@ -266,25 +272,25 @@ sub requestitem {
             $response->problem($problem);
             return $response;
         }
+        $biblionumber = $itemdata->{'biblionumber'};
+    } elsif ( $itemidentifiervalue ne '' && $itemidentifiertype eq "ISBN" ) {
+        # We have an ISBN
+        $biblionumber = _get_biblionumber_from_standardnumber( 'isbn', $itemidentifiervalue );
+        unless ( $biblionumber ) {
+            my $problem = NCIP::Problem->new({
+                ProblemType    => 'Unknown Item',
+                ProblemDetail  => "Item $itemidentifiervalue is unknown",
+                ProblemElement => 'ItemIdentifierValue',
+                ProblemValue   => $itemidentifiervalue,
+            });
+            $response->problem($problem);
+            return $response;
+        }
     }
+    my $bibliodata   = GetBiblioData( $biblionumber );
     
-    my $bibliodata   = GetBiblioData( $itemdata->{'biblionumber'} );
-    my $lang_code = _get_langcode_from_bibliodata( $bibliodata );
-    
-    
-    # FIXME Deal with BibliographicId
-    # else {
-    #     if ( $type eq 'SYSNUMBER' ) {
-    #         $itemdata = GetBiblioData($biblionumber);
-    #     }
-    #     elsif ( $type eq 'ISBN' ) {
-
-    #         #deal with this
-    #     }
-    # }
-
     # Bail out if we have no data by now
-    unless ($itemdata) {
+    unless ( $bibliodata ) {
         my $problem = NCIP::Problem->new({
             ProblemType    => 'Unknown Item',
             ProblemDetail  => "Item is unknown",
@@ -298,13 +304,13 @@ sub requestitem {
     # Create a new request with the newly created biblionumber
     my $illRequest   = Koha::ILLRequests->new;
     my $saved_request = $illRequest->request({
-        'biblionumber' => $itemdata->{'biblionumber'},
+        'biblionumber' => $biblionumber,
         'branch'       => 'ILL', # FIXME
         'borrower'     => $borrower->{'borrowernumber'}, # Home Library
     });
     $saved_request->editStatus({
         'remote_user'    => $request->{$message}->{UserId}->{UserIdentifierValue},
-        'remote_id'      => 'NO-' . $request->{$message}->{RequestId}->{AgencyId} . ':' . $request->{$message}->{RequestId}->{RequestIdentifierValue},
+        'remote_id'      => $request->{$message}->{RequestId}->{AgencyId} . ':' . $request->{$message}->{RequestId}->{RequestIdentifierValue},
         'remote_barcode' => $request->{$message}->{ItemId}->{ItemIdentifierValue},
         'reqtype'        => $request->{$message}->{RequestType},
     });
@@ -380,7 +386,7 @@ sub requestitem {
                 Publisher          => $bibliodata->{'publishercode'},
                 Title              => $bibliodata->{'title'},
                 BibliographicLevel => 'Book', # FIXME
-                Language           => $lang_code,
+                Language           => _get_langcode_from_bibliodata( $bibliodata ),
                 MediumType         => 'Book', # FIXME
             }
         ),
@@ -616,6 +622,19 @@ sub renewitem {
 
 Handle the NCIP CancelRequestItem message.
 
+This can be the result of:
+
+=over 4
+
+=item * the Home library cancelling a RequestItem
+
+=item * the Owner library rejecting a RequestItem
+
+=back
+
+In the first case, the status will be NEW or SHIPPED. In the second case, it
+will be ORDERED.
+
 =cut
 
 sub cancelrequestitem {
@@ -661,29 +680,45 @@ sub cancelrequestitem {
     # FIXME We can be more specific about the failure if we check the reserve
     # more in depth before we do CancelReserve, e.g. with GetReserve
 
-    # We need to figure out if this is the home library cancelling a request it
-    # has sent out, or an owner library rejecting a request it has received
-    if ( $request->{$message}->{Ext}->{NoticeContent} eq 'CancelledBy.Borrower' ) {
+    # We need to figure out if this is 
+    # * the home library cancelling a request it has sent out (NNCIPP call #10)
+    # * an owner library rejecting a request it has received (NNCIPP call #11)
+    
+    my $remote_id = $request->{$message}->{RequestId}->{AgencyId} . ':' . $request->{$message}->{RequestId}->{RequestIdentifierValue};
+    my $illRequests = Koha::ILLRequests->new;
+    my $saved_requests = $illRequests->search({
+        'remote_id' => $remote_id,
+        'status'    => 'NEW',
+    });
+    unless ( defined $saved_requests->[0] ) {
+        $saved_requests = $illRequests->search({
+            'remote_id' => $remote_id,
+            'status'    => 'SHIPPED',
+        });
+    }
+    unless ( defined $saved_requests->[0] ) {
+        $saved_requests = $illRequests->search({
+            'remote_id' => $remote_id,
+            'status'    => 'ORDERED',
+        });
+    }
+    # There should only be one request, so we use the zero'th one
+    my $saved_request = $saved_requests->[0];
+    unless ( $saved_request ) {
+        my $problem = NCIP::Problem->new({
+            ProblemType    => 'RequestItem can not be cancelled',
+            ProblemDetail  => "Request with id $remote_id unknown",
+            ProblemElement => 'RequestIdentifierValue',
+            ProblemValue   => $remote_id,
+        });
+        $response->problem($problem);
+        return $response;
+    }
+    
+    # FIXME
+    if ( $saved_request->status->getProperty('status') eq 'NEW' || $saved_request->status->getProperty('status') eq 'SHIPPED' ) {
 
         # The request is being cancelled (withdrawn) by the home library
-
-        my $remote_id = $request->{$message}->{RequestId}->{AgencyId} . ':' . $request->{$message}->{RequestId}->{RequestIdentifierValue};
-        my $illRequests = Koha::ILLRequests->new;
-        my $saved_requests = $illRequests->search({
-            'remote_id' => $remote_id,
-        });
-        # There should only be one request, so we use the zero'th one
-        my $saved_request = $saved_requests->[0];
-        unless ( $saved_request ) {
-            my $problem = NCIP::Problem->new({
-                ProblemType    => 'RequestItem can not be cancelled',
-                ProblemDetail  => "Request with id $remote_id unknown",
-                ProblemElement => 'RequestIdentifierValue',
-                ProblemValue   => $remote_id,
-            });
-            $response->problem($problem);
-            return $response;
-        }
 
         # Now we check if the request has already been processed or not
         my $data;
@@ -751,29 +786,9 @@ sub cancelrequestitem {
         $response->data($data);
         return $response;
 
-    } else {
+    } if ( $saved_request->status->getProperty('status') eq 'ORDERED' ) {
 
         # The request is being rejected by the owner library
-
-        my $local_id = $request->{$message}->{RequestId}->{RequestIdentifierValue};
-        debug "*** local_id: $local_id";
-        my $illRequests = Koha::ILLRequests->new;
-        my $saved_requests = $illRequests->search({
-            'id' => $local_id,
-        });
-        debug "*** count: " . scalar @{ $saved_requests };
-        # There should only be one request, so we use the zero'th one
-        my $saved_request = $saved_requests->[0];
-        unless ( $saved_request ) {
-            my $problem = NCIP::Problem->new({
-                ProblemType    => 'RequestItem can not be cancelled',
-                ProblemDetail  => "Request with id $local_id unknown",
-                ProblemElement => 'RequestIdentifierValue',
-                ProblemValue   => $local_id,
-            });
-            $response->problem($problem);
-            return $response;
-        }
 
         $saved_request->editStatus({ 'status' => 'REJECTED' });
         my $data = {
@@ -814,6 +829,42 @@ sub _isil2barcode {
 
 }
 
+=head2 _get_biblionumber_from_standardnumber
+
+Take an "standard number" like ISBN, ISSN or EAN, normalize it, look it up in 
+the correct column of biblioitems and return the biblionumber of the first 
+matching record. Legal types:
+
+=back 4
+
+=item * isbn
+
+=item * issn
+
+=item * ean
+
+=back
+
+Hyphens will be removed, both from the input standard number and from the 
+numbers stored in the Koha database.
+
+=cut
+
+sub _get_biblionumber_from_standardnumber {
+
+    my ( $type, $value ) = @_;
+    my $dbh = C4::Context->dbh();
+    my $sth = $dbh->prepare("SELECT biblionumber FROM biblioitems WHERE REPLACE( $type, '-', '' ) LIKE REPLACE( '$value', '-', '')");
+    $sth->execute();
+    my $data = $sth->fetchrow_hashref;
+    if ( $data && $data->{ 'biblionumber' } ) {
+        return $data->{ 'biblionumber' };
+    } else {
+        return undef;
+    }
+
+}
+
 =head2 _get_langcode_from_bibliodata 
 
 Take a record and pick ut the language code in controlfield 008, position 35-37.
@@ -826,12 +877,16 @@ sub _get_langcode_from_bibliodata {
 
     my $marcxml = $bibliodata->{'marcxml'};
     my $record = MARC::Record->new_from_xml( $marcxml, 'UTF-8' );
-    my $f008 = $record->field( '008' )->data();
-    my $lang_code = '   ';
-    if ( $f008 ) {
-        $lang_code = substr $f008, 35, 3;
+    if ( $record->field( '008' ) && $record->field( '008' )->data() ) {
+        my $f008 = $record->field( '008' )->data();
+        my $lang_code = '   ';
+        if ( $f008 ) {
+            $lang_code = substr $f008, 35, 3;
+        }
+        return $lang_code;
+    } else {
+        return '   ';
     }
-    return $lang_code;
 
 }
 
