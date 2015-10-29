@@ -67,9 +67,7 @@ sub process_request {
         $type = $self->{ils}->parse_request_type($request);
         if ($type) {
             my $message = lc($type);
-            warn $message;
             if ($self->{ils}->can($message)) {
-                warn 'can!';
                 $response = $self->{ils}->$message($request);
             } else {
                 $response = $self->{ils}->unsupportedservice($request);
