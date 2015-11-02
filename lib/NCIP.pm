@@ -9,10 +9,8 @@ use Try::Tiny;
 use Module::Load;
 use Template;
 use Log::Log4perl;
-
+use Encode qw( encode_utf8 decode_utf8 );
 use Object::Tiny qw{config namespace ils};
-
-binmode( STDOUT, ":utf8" );
 
 our $VERSION           = '0.01';
 our $strict_validation = 0;        # move to config file
@@ -56,7 +54,7 @@ sub new {
 
 sub process_request {
     my $self           = shift;
-    my $xml            = shift;
+    my $xml            = encode_utf8( shift );
 
     # Declare our response object:
     my $response;
