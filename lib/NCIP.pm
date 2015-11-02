@@ -12,6 +12,8 @@ use Log::Log4perl;
 
 use Object::Tiny qw{config namespace ils};
 
+binmode( STDOUT, ":utf8" );
+
 our $VERSION           = '0.01';
 our $strict_validation = 0;        # move to config file
 
@@ -175,7 +177,7 @@ sub render_output {
     );
 
     my $output;
-    $template->process( 'response.tt', $response, \$output );
+    $template->process( 'response.tt', $response, \$output, { binmode => ':encoding(utf8)' } );
     return $output;
 }
 
