@@ -140,7 +140,7 @@ sub itemshipped {
     });
     # There should only be one request, so we use the zero'th one
     my $saved_request = $saved_requests->[0];
-    $saved_request->editStatus({ 'status' => 'SHIPPING' });
+    $saved_request->editStatus({ 'status' => 'SHIPPING_O' });
     $saved_request->editStatus({ 'remote_barcode' => $request->{$message}->{ItemId}->{ItemIdentifierValue} });
 
     # FIXME Update the bibliographic data if new data is sent
