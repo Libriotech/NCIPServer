@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <ns1:NCIPMessage xmlns:ns1="http://www.niso.org/2008/ncip" ns1:version="http://www.niso.org/schemas/ncip/v2_02/ncip_v2_02.xsd" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.niso.org/2008/ncip http://www.niso.org/schemas/ncip/v2_02/ncip_v2_02.xsd">
 	<!-- ACK = acknowledge the acknowledgement -->
-	<!-- Usage in NNCIPP 1.0 is in use-case 2, call #5: ACK "Home library acknowledge the shipped Item" -->
+	<!-- Usage in NNCIPP 1.0 is in use-case 2, call #5: ACK "Home library acknowledge the shipped Item" or... -->
+	<!-- Usage in NNCIPP 1.0 is in use-case 2, call #7: ACK "Owner library acknowledge recpient of the shipped Item from Home Library" -->
 	<ns1:ItemReceivedResponse>
 		<ns1:ResponseHeader>
 			<!-- Owner Library -->
