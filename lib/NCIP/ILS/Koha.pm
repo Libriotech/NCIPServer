@@ -253,10 +253,18 @@ sub requestitem {
     }
     
     my $biblionumber;
-    # Find the barcode from the request, if there is one
-    # FIXME Figure out if we have a barcode or RFID
-    my $itemidentifiertype  = $request->{$message}->{ItemId}->{ItemIdentifierType};
-    my $itemidentifiervalue = $request->{$message}->{ItemId}->{ItemIdentifierValue};
+    # Find the identifier and the identifiertype from the request, if there is one
+    # We have either ItemIdentifierType+ItemIdentifierValue or
+    # BibliographicRecordIdentifierCode+BibliographicRecordIdentifier
+    my $itemidentifiertype;
+    my $itemidentifiervalue;
+    if ( $request->{$message}->{ItemId}->{ItemIdentifierType} && $request->{$message}->{ItemId}->{ItemIdentifierValue} ) {
+        $itemidentifiertype  = $request->{$message}->{ItemId}->{ItemIdentifierType};
+        $itemidentifiervalue = $request->{$message}->{ItemId}->{ItemIdentifierValue};
+    } else {
+        $itemidentifiertype  = $request->{$message}->{BibliographicId}->{BibliographicRecordId}->{BibliographicRecordIdentifierCode};
+        $itemidentifiervalue = $request->{$message}->{BibliographicId}->{BibliographicRecordId}->{BibliographicRecordIdentifier};
+    }
     my ( $barcode, $barcode_field ) = $self->find_item_barcode($request);
     if ( $itemidentifiervalue ne '' && $itemidentifiertype eq "Barcode" ) {
         # We have a barcode (or something passing itself off as a barcode), 
@@ -273,7 +281,7 @@ sub requestitem {
             return $response;
         }
         $biblionumber = $itemdata->{'biblionumber'};
-    } elsif ( $itemidentifiervalue ne '' && ( $itemidentifiertype eq "ISBN" || $itemidentifiertype eq "ISSN" || $itemidentifiertype eq "EAN" ) ) {
+    } elsif ( $itemidentifiervalue ne '' && ( $itemidentifiertype eq "OwnerLocalRecordID" || $itemidentifiertype eq "ISBN" || $itemidentifiertype eq "ISSN" || $itemidentifiertype eq "EAN" ) ) {
         $biblionumber = _get_biblionumber_from_standardnumber( lc( $itemidentifiertype ), $itemidentifiervalue );
         unless ( $biblionumber ) {
             my $problem = NCIP::Problem->new({
