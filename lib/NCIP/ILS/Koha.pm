@@ -114,7 +114,8 @@ sub lookupagency {
 
 Handle the NCIP ItemShipped message.
 
-Set status = SHIPPING.
+Set status = SHIPPING_O if we are the Owner Library
+Set status = SHIPPING if we are the Home Library
 
 =cut
 
@@ -140,7 +141,15 @@ sub itemshipped {
     });
     # There should only be one request, so we use the zero'th one
     my $saved_request = $saved_requests->[0];
-    $saved_request->editStatus({ 'status' => 'SHIPPING_O' });
+    # Check if this is a request we created or not
+    if ( exists config->{'isilmap'}->{ $request->{$message}->{RequestId}->{AgencyId} } ) {
+        # If the AgencyId in the RequestId is one of ours, we created the request in
+        # the first place, and we are the Home Library
+        $saved_request->editStatus({ 'status' => 'SHIPPING' });
+    } else {
+        # If the AgencyId is not in the "isilmap" we are the Owner Library
+        $saved_request->editStatus({ 'status' => 'SHIPPING_O' });
+    }
     $saved_request->editStatus({ 'remote_barcode' => $request->{$message}->{ItemId}->{ItemIdentifierValue} });
 
     # FIXME Update the bibliographic data if new data is sent
