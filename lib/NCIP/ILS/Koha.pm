@@ -24,7 +24,7 @@ use C4::Biblio;
 use C4::Branch;
 use C4::Circulation qw { AddRenewal CanBookBeRenewed GetRenewCount };
 use C4::Members qw{ GetMemberDetails };
-use C4::Items qw { AddItem GetItem };
+use C4::Items qw { AddItem GetItem GetItemsByBiblioitemnumber };
 use C4::Reserves qw {CanBookBeReserved AddReserve GetReservesFromItemnumber CancelReserve GetReservesFromBiblionumber};
 use C4::Log;
 
@@ -295,7 +295,7 @@ sub requestitem {
         }
     }
     my $bibliodata   = GetBiblioData( $biblionumber );
-    
+
     # Bail out if we have no data by now
     unless ( $bibliodata ) {
         my $problem = NCIP::Problem->new({
@@ -308,7 +308,13 @@ sub requestitem {
         return $response;
     }
 
-    # Create a new request with the newly created biblionumber
+    # Locate an item that we can connect the request to
+    my $items = GetItemsByBiblioitemnumber( $biblionumber );
+    # FIXME C4::Reserves::CanItemBeReserved()
+    # For now, we just reserve the first one
+    my $item = $items->[0];
+
+    # Create a new request with the biblionumber we have found
     my $illRequest   = Koha::ILLRequests->new;
     my $saved_request = $illRequest->request({
         'biblionumber' => $biblionumber,
@@ -318,7 +324,7 @@ sub requestitem {
     $saved_request->editStatus({
         'remote_user'    => $request->{$message}->{UserId}->{UserIdentifierValue},
         'remote_id'      => $request->{$message}->{RequestId}->{AgencyId} . ':' . $request->{$message}->{RequestId}->{RequestIdentifierValue},
-        'remote_barcode' => $request->{$message}->{ItemId}->{ItemIdentifierValue},
+        'remote_barcode' => $item->{'barcode'},
         'reqtype'        => $request->{$message}->{RequestType},
     });
 
@@ -375,8 +381,8 @@ sub requestitem {
         }),
         ItemId => NCIP::Item::Id->new(
             {
-                ItemIdentifierValue => $itemidentifiervalue,
-                ItemIdentifierType => $itemidentifiertype,
+                ItemIdentifierValue => $item->{'barcode'},
+                ItemIdentifierType => 'Barcode',
             }
         ),
         UserId => NCIP::User::Id->new(
