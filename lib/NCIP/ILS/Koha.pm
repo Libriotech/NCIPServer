@@ -140,8 +140,6 @@ sub itemshipped {
         # of RequestIdentifierValue directly against the id column
         'remote_id' => $request->{$message}->{RequestId}->{AgencyId} . ':' . $request->{$message}->{RequestId}->{RequestIdentifierValue},
     });
-    # There should only be one request, so we use the zero'th one
-    # my $saved_request = $saved_requests->[0];
     # Check if this is a request we created or not
     if ( exists config->{'isilmap'}->{ $request->{$message}->{RequestId}->{AgencyId} } ) {
         # If the AgencyId in the RequestId is one of ours, we created the request in
@@ -193,12 +191,10 @@ sub itemreceived {
     # FIXME Change the status of the request
     # Find the request
     my $Illrequests = Koha::Illrequests->new;
-    my $saved_requests = $Illrequests->search({
+    my $saved_request = $Illrequests->search({
         'status'    => 'SHIPPED',
         'remote_id' => $request->{$message}->{RequestId}->{AgencyId} . ':' . $request->{$message}->{RequestId}->{RequestIdentifierValue},
     });
-    # There should only be one request, so we use the zero'th one
-    my $saved_request = $saved_requests->[0];
     $saved_request->editStatus({ 'status' => 'RECEIVED' });
 
     my $data = {
