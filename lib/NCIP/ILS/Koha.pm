@@ -481,7 +481,7 @@ sub itemrequested {
 
     # Get the borrower that the request is meant for
     my $cardnumber = $request->{$message}->{UserId}->{UserIdentifierValue};
-    my $borrower = GetMemberDetails( undef, $cardnumber );
+    my $borrower = GetMember( 'cardnumber' => $cardnumber );
 
     # Create a new request with the newly created biblionumber
     my $illRequest   = Koha::Illrequests->new;
@@ -490,8 +490,8 @@ sub itemrequested {
         'branch'       => 'ILL', # FIXME
         'borrower'     => $borrower->{'borrowernumber'},
         'ordered_from' => $ordered_from,
+        'status'       => 'ORDERED'
     });
-    $saved_request->editStatus({ 'status' => 'ORDERED' });
 
     my $data = {
         RequestType  => $message,
