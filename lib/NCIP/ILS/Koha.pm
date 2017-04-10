@@ -250,7 +250,7 @@ sub requestitem {
 
     # Find the library (borrower) based on the FromAgencyId
     my $cardnumber = _isil2barcode( $request->{$message}->{InitiationHeader}->{FromAgencyId}->{AgencyId} );
-    my $borrower = GetMemberDetails( undef, $cardnumber );
+    my $borrower = GetMember( 'cardnumber' => $cardnumber );
     unless ( $borrower ) {
         my $problem = NCIP::Problem->new({
             ProblemType    => 'Unknown User',
