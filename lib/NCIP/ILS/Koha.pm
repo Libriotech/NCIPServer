@@ -682,7 +682,7 @@ sub cancelrequestitem {
     }
 
     # Find the borrower based on the cardnumber
-    my $borrower = GetMemberDetails( undef, $cardnumber );
+    my $borrower = GetMember( 'cardnumber' => $cardnumber );
     unless ( $borrower ) {
         my $problem = NCIP::Problem->new({
             ProblemType    => 'Unknown User',
