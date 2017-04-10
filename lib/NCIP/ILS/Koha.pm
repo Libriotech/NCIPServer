@@ -21,14 +21,14 @@ use Data::Dumper; # FIXME Debug
 use Dancer ':syntax';
 
 use C4::Biblio;
-use C4::Branch;
 use C4::Circulation qw { AddRenewal CanBookBeRenewed GetRenewCount };
-use C4::Members qw{ GetMemberDetails };
+use C4::Members qw{ GetMember };
 use C4::Items qw { AddItem GetItem GetItemsByBiblioitemnumber };
-use C4::Reserves qw {CanBookBeReserved AddReserve GetReservesFromItemnumber CancelReserve GetReservesFromBiblionumber};
+use C4::Reserves qw {CanBookBeReserved AddReserve GetReservesFromItemnumber CancelReserve };
 use C4::Log;
 
-use Koha::ILLRequests;
+# use Koha::ILLRequests;
+use Koha::Libraries;
 
 use NCIP::Item::Id;
 use NCIP::Problem;
@@ -92,7 +92,8 @@ sub lookupagency {
     my $response = NCIP::Response->new({type => $message . 'Response'});
     $response->header($self->make_header($request));
 
-    my $library = GetBranchDetail( config->{'isilmap'}->{ $request->{$message}->{InitiationHeader}->{ToAgencyId}->{AgencyId} } );
+    # my $library = GetBranchDetail( config->{'isilmap'}->{ $request->{$message}->{InitiationHeader}->{ToAgencyId}->{AgencyId} } );
+    my $library = Koha::Libraries->find({ 'branchcode' => config->{'isilmap'}->{ $request->{$message}->{InitiationHeader}->{ToAgencyId}->{AgencyId} } });
 
     my $data = {
         fromagencyid => $request->{$message}->{InitiationHeader}->{ToAgencyId}->{AgencyId},
