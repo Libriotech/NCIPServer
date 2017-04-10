@@ -27,7 +27,7 @@ use C4::Items qw { AddItem GetItem GetItemsByBiblioitemnumber };
 use C4::Reserves qw {CanBookBeReserved AddReserve GetReservesFromItemnumber CancelReserve };
 use C4::Log;
 
-# use Koha::ILLRequests;
+use Koha::Illrequests;
 use Koha::Libraries;
 
 use NCIP::Item::Id;
@@ -134,14 +134,14 @@ sub itemshipped {
     
     # Change the status of the request
     # Find the request
-    my $illRequests = Koha::ILLRequests->new;
-    my $saved_requests = $illRequests->search({
+    my $Illrequests = Koha::Illrequests->new;
+    my $saved_request = $Illrequests->search({
         # This is a request we have sent out ourselves, so we can use the value
         # of RequestIdentifierValue directly against the id column
         'remote_id' => $request->{$message}->{RequestId}->{AgencyId} . ':' . $request->{$message}->{RequestId}->{RequestIdentifierValue},
     });
     # There should only be one request, so we use the zero'th one
-    my $saved_request = $saved_requests->[0];
+    # my $saved_request = $saved_requests->[0];
     # Check if this is a request we created or not
     if ( exists config->{'isilmap'}->{ $request->{$message}->{RequestId}->{AgencyId} } ) {
         # If the AgencyId in the RequestId is one of ours, we created the request in
@@ -192,8 +192,8 @@ sub itemreceived {
 
     # FIXME Change the status of the request
     # Find the request
-    my $illRequests = Koha::ILLRequests->new;
-    my $saved_requests = $illRequests->search({
+    my $Illrequests = Koha::Illrequests->new;
+    my $saved_requests = $Illrequests->search({
         'status'    => 'SHIPPED',
         'remote_id' => $request->{$message}->{RequestId}->{AgencyId} . ':' . $request->{$message}->{RequestId}->{RequestIdentifierValue},
     });
@@ -325,7 +325,7 @@ sub requestitem {
     my $item = $items->[0];
 
     # Create a new request with the biblionumber we have found
-    my $illRequest   = Koha::ILLRequests->new;
+    my $illRequest   = Koha::Illrequests->new;
     my $saved_request = $illRequest->request({
         'biblionumber' => $biblionumber,
         'branch'       => 'ILL', # FIXME
@@ -488,7 +488,7 @@ sub itemrequested {
     my $borrower = GetMemberDetails( undef, $cardnumber );
 
     # Create a new request with the newly created biblionumber
-    my $illRequest   = Koha::ILLRequests->new;
+    my $illRequest   = Koha::Illrequests->new;
     my $saved_request = $illRequest->request({
         'biblionumber' => $biblionumber,
         'branch'       => 'ILL', # FIXME
@@ -593,8 +593,8 @@ sub renewitem {
     if ( $datedue ) {
         # The renewal was successfull, change the status of the request
         # Find the request
-        my $illRequests = Koha::ILLRequests->new;
-        my $saved_requests = $illRequests->search({
+        my $Illrequests = Koha::Illrequests->new;
+        my $saved_requests = $Illrequests->search({
             'status'         => 'RECEIVED',
             'remote_barcode' => $request->{$message}->{ItemId}->{ItemIdentifierValue},
         });
@@ -708,19 +708,19 @@ sub cancelrequestitem {
     # * an owner library rejecting a request it has received (NNCIPP call #11)
     
     my $remote_id = $request->{$message}->{RequestId}->{AgencyId} . ':' . $request->{$message}->{RequestId}->{RequestIdentifierValue};
-    my $illRequests = Koha::ILLRequests->new;
-    my $saved_requests = $illRequests->search({
+    my $Illrequests = Koha::Illrequests->new;
+    my $saved_requests = $Illrequests->search({
         'remote_id' => $remote_id,
         'status'    => 'NEW',
     });
     unless ( defined $saved_requests->[0] ) {
-        $saved_requests = $illRequests->search({
+        $saved_requests = $Illrequests->search({
             'remote_id' => $remote_id,
             'status'    => 'SHIPPED',
         });
     }
     unless ( defined $saved_requests->[0] ) {
-        $saved_requests = $illRequests->search({
+        $saved_requests = $Illrequests->search({
             'remote_id' => $remote_id,
             'status'    => 'ORDERED',
         });
