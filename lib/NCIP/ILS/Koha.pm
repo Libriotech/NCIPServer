@@ -27,7 +27,8 @@ use C4::Items qw { AddItem GetItem GetItemsByBiblioitemnumber };
 use C4::Reserves qw {CanBookBeReserved AddReserve GetReservesFromItemnumber CancelReserve };
 use C4::Log;
 
-use Koha::Illrequests;
+use Koha::Illrequest;
+use Koha::Illrequest::Config;
 use Koha::Libraries;
 
 use NCIP::Item::Id;
@@ -461,15 +462,24 @@ sub itemrequested {
     </datafield>
     <datafield tag="245" ind1=" " ind2=" ">
         <subfield code="a">' . $bibdata->{Title} . '</subfield>
-    </datafield>
-    <datafield tag="260" ind1=" " ind2=" ">
-        <subfield code="a">' . $bibdata->{PlaceOfPublication} . '</subfield>
-        <subfield code="b">' . $bibdata->{Publisher} .          '</subfield>
-        <subfield code="c">' . $bibdata->{PublicationDate} .    '</subfield>
-    </datafield>
-    </record>';
+    </datafield>';
+    if ( $bibdata->{PlaceOfPublication} || $bibdata->{Publisher} || $bibdata->{PublicationDate} ) {
+        $xml .= '<datafield tag="260" ind1=" " ind2=" ">';
+            if ( $bibdata->{PlaceOfPublication} ) {
+                $xml .= '<subfield code="a">' . $bibdata->{PlaceOfPublication} . '</subfield>';
+            }
+            if ( $bibdata->{PlaceOfPublication} ) {
+                $xml .= '<subfield code="b">' . $bibdata->{Publisher} .          '</subfield>';
+            }
+            if ( $bibdata->{PlaceOfPublication} ) {
+                $xml .= '<subfield code="c">' . $bibdata->{PublicationDate} .    '</subfield>';
+            }
+        $xml .= '</datafield>';
+    }
+    $xml .= '</record>';
     my $record = MARC::Record->new_from_xml( $xml, 'UTF-8' );
     my ( $biblionumber, $biblioitemnumber ) = AddBiblio( $record, 'FA' );
+    warn "biblionumber $biblionumber created";
 
     # Add an item
     my $item = {
@@ -478,20 +488,42 @@ sub itemrequested {
         'itype'         => 'ILL',
     };
     my ( $x_biblionumber, $x_biblioitemnumber, $itemnumber ) = AddItem( $item, $biblionumber );
+    warn "itemnumber $itemnumber created";
 
     # Get the borrower that the request is meant for
     my $cardnumber = $request->{$message}->{UserId}->{UserIdentifierValue};
     my $borrower = GetMember( 'cardnumber' => $cardnumber );
 
     # Create a new request with the newly created biblionumber
-    my $illRequest   = Koha::Illrequests->new;
-    my $saved_request = $illRequest->request({
-        'biblionumber' => $biblionumber,
-        'branch'       => 'ILL', # FIXME
-        'borrower'     => $borrower->{'borrowernumber'},
-        'ordered_from' => $ordered_from,
-        'status'       => 'ORDERED'
+
+    my $illrequest = Koha::Illrequest->new;
+    $illrequest->load_backend( 'NNCIPP' );
+    my $backend_result = $illrequest->backend_create({
+        'borrowernumber' => 51, # FIXME
+        'biblionumber'   => $biblionumber,
+        'branchcode'     => 'ILL', # FIXME
+        'status'         => 'ORDERED',
+        'medium'         => 'Book', # FIXME
+        'backend'        => 'NNCIPP',
+        'attr'           => {
+            'title'        => $bibdata->{Title},
+            'author'       => $bibdata->{Author},
+            'ordered_from' => $ordered_from,
+        },
+        'stage'          => 'commit',
     });
+    warn Dumper $illrequest;
+    warn Dumper $backend_result;
+
+    # OLDWAY
+    # my $illRequest   = Koha::Illrequests->new;
+    # my $saved_request = $illRequest->request({
+    #     'biblionumber' => $biblionumber,
+    #     'branch'       => 'ILL', # FIXME
+    #     'borrower'     => $borrower->{'borrowernumber'},
+    #     'ordered_from' => $ordered_from,
+    #     'status'       => 'ORDERED'
+    # });
 
     my $data = {
         RequestType  => $message,
