@@ -499,7 +499,7 @@ sub itemrequested {
     my $illrequest = Koha::Illrequest->new;
     $illrequest->load_backend( 'NNCIPP' );
     my $backend_result = $illrequest->backend_create({
-        'borrowernumber' => 51, # FIXME
+        'borrowernumber' => $borrower->{cardnumber},
         'biblionumber'   => $biblionumber,
         'branchcode'     => 'ILL', # FIXME
         'status'         => 'ORDERED',
@@ -509,6 +509,7 @@ sub itemrequested {
             'title'        => $bibdata->{Title},
             'author'       => $bibdata->{Author},
             'ordered_from' => $ordered_from,
+            'id'           => 1,
         },
         'stage'          => 'commit',
     });
