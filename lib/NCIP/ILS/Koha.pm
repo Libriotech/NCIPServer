@@ -24,7 +24,7 @@ use C4::Biblio;
 use C4::Circulation qw { AddRenewal CanBookBeRenewed GetRenewCount };
 use C4::Members qw{ GetMember };
 use C4::Items qw { AddItem GetItem GetItemsByBiblioitemnumber };
-use C4::Reserves qw {CanBookBeReserved AddReserve GetReservesFromItemnumber CancelReserve };
+use C4::Reserves qw {CanBookBeReserved AddReserve CancelReserve };
 use C4::Log;
 
 use Koha::Illrequest;
@@ -362,7 +362,7 @@ sub requestitem {
     #     } else {
     #         my ( $reservedate, $borrowernumber, $branchcode2, $reserve_id,
     #             $wait )
-    #           = GetReservesFromItemnumber( $itemdata->{'itemnumber'} );
+    #           = GetReservesFromItemnumber( $itemdata->{'itemnumber'} ); # GetReservesFromItemnumber has been removed
     #         $request_id = $reserve_id;
     #     }
     # } else {
