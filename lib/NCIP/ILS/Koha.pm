@@ -481,7 +481,7 @@ sub itemrequested {
     my ( $biblionumber, $biblioitemnumber ) = AddBiblio( $record, 'FA' );
     warn "biblionumber $biblionumber created";
 
-    # Add an item
+    # Add an item FIXME This should not be hardcoded
     my $item = {
         'homebranch'    => 'ILL',
         'holdingbranch' => 'ILL',
