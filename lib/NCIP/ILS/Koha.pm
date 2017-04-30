@@ -222,6 +222,7 @@ Set status = ???
 =cut
 
 sub requestitem {
+
     my $self = shift;
     my $request = shift;
     # Check our session and login if necessary:
@@ -261,8 +262,10 @@ sub requestitem {
     
     my $biblionumber;
     # Find the identifier and the identifiertype from the request, if there is one
-    # We have either ItemIdentifierType+ItemIdentifierValue or
-    # BibliographicRecordIdentifierCode+BibliographicRecordIdentifier
+    # We have either 
+    #    ItemIdentifierType + ItemIdentifierValue
+    # or
+    #    BibliographicRecordIdentifierCode + BibliographicRecordIdentifier
     my $itemidentifiertype;
     my $itemidentifiervalue;
     if ( $request->{$message}->{ItemId}->{ItemIdentifierType} && $request->{$message}->{ItemId}->{ItemIdentifierValue} ) {
@@ -272,7 +275,7 @@ sub requestitem {
         $itemidentifiertype  = $request->{$message}->{BibliographicId}->{BibliographicRecordId}->{BibliographicRecordIdentifierCode};
         $itemidentifiervalue = $request->{$message}->{BibliographicId}->{BibliographicRecordId}->{BibliographicRecordIdentifier};
     }
-    my ( $barcode, $barcode_field ) = $self->find_item_barcode($request);
+    # my ( $barcode, $barcode_field ) = $self->find_item_barcode($request);
     if ( $itemidentifiervalue ne '' && $itemidentifiertype eq "Barcode" ) {
         # We have a barcode (or something passing itself off as a barcode), 
         # try to use it to get item data
@@ -301,7 +304,9 @@ sub requestitem {
             return $response;
         }
     }
+    warn "biblionumber $biblionumber";
     my $bibliodata   = GetBiblioData( $biblionumber );
+    warn Dumper $bibliodata;
 
     # Bail out if we have no data by now
     unless ( $bibliodata ) {
@@ -321,19 +326,42 @@ sub requestitem {
     # For now, we just reserve the first one
     my $item = $items->[0];
 
+    # NEW WAY
+    my $illrequest = Koha::Illrequest->new;
+    $illrequest->load_backend( 'NNCIPP' );
+    my $backend_result = $illrequest->backend_create({
+        'borrowernumber' => $borrower->{borrowernumber},
+        'biblionumber'   => $biblionumber,
+        'branchcode'     => 'ILL', # FIXME
+        'status'         => 'O_REQUESTITEM',
+        'backend'        => 'NNCIPP',
+        'attr'           => {
+            'requested_by' => _isil2barcode( $request->{$message}->{InitiationHeader}->{FromAgencyId}->{AgencyId} ),
+            'UserIdentifierValue'    => $request->{$message}->{UserId}->{UserIdentifierValue},
+            'ItemIdentifierType'     => $request->{$message}->{ItemId}->{ItemIdentifierType},
+            'ItemIdentifierValue'    => $request->{$message}->{ItemId}->{ItemIdentifierValue},
+            'AgencyId'               => $request->{$message}->{RequestId}->{AgencyId},
+            'RequestIdentifierValue' => $request->{$message}->{RequestId}->{RequestIdentifierValue},
+            'RequestType'            => $request->{$message}->{RequestType},
+            'RequestScopeType'       => $request->{$message}->{RequestScopeType},
+        },
+        'stage'          => 'commit',
+    });
+
+    # OLD WAY
     # Create a new request with the biblionumber we have found
-    my $illRequest   = Koha::Illrequests->new;
-    my $saved_request = $illRequest->request({
-        'biblionumber' => $biblionumber,
-        'branch'       => 'ILL', # FIXME
-        'borrower'     => $borrower->{'borrowernumber'}, # Home Library
-    });
-    $saved_request->editStatus({
-        'remote_user'    => $request->{$message}->{UserId}->{UserIdentifierValue},
-        'remote_id'      => $request->{$message}->{RequestId}->{AgencyId} . ':' . $request->{$message}->{RequestId}->{RequestIdentifierValue},
-        'remote_barcode' => $item->{'barcode'},
-        'reqtype'        => $request->{$message}->{RequestType},
-    });
+    # my $illRequest   = Koha::Illrequests->new;
+    # my $saved_request = $illRequest->request({
+    #     'biblionumber' => $biblionumber,
+    #     'branch'       => 'ILL', # FIXME
+    #     'borrower'     => $borrower->{'borrowernumber'}, # Home Library
+    # });
+    # $saved_request->editStatus({
+    #     'remote_user'    => $request->{$message}->{UserId}->{UserIdentifierValue},
+    #     'remote_id'      => $request->{$message}->{RequestId}->{AgencyId} . ':' . $request->{$message}->{RequestId}->{RequestIdentifierValue},
+    #     'remote_barcode' => $item->{'barcode'},
+    #     'reqtype'        => $request->{$message}->{RequestType},
+    # });
 
     # Check if it is possible to make a reservation
     # if ( CanBookBeReserved( $borrower->{borrowernumber}, $itemdata->{biblionumber} )) {
@@ -400,7 +428,7 @@ sub requestitem {
         RequestType => $request->{$message}->{RequestType},
         ItemOptionalFields => NCIP::Item::BibliographicDescription->new(
             {
-                Author             => $bibliodata->{'author'},
+                Author             => $bibliodata->{'author'} || 'Unknown',
                 PlaceOfPublication => $bibliodata->{'place'},
                 PublicationDate    => $bibliodata->{'copyrightdate'},
                 Publisher          => $bibliodata->{'publishercode'},
@@ -453,8 +481,10 @@ sub itemrequested {
 
     # Get the ID of library we ordered from
     my $ordered_from = _isil2barcode( $request->{$message}->{InitiationHeader}->{FromAgencyId}->{AgencyId} );
+    my $ordered_from_patron = GetMember( cardnumber => $ordered_from );
 
     # Create a minimal MARC record based on ItemOptionalFields
+    # FIXME This could be done in a more elegant way
     my $bibdata = $request->{$message}->{ItemOptionalFields}->{BibliographicDescription};
     my $xml = '<record>
     <datafield tag="100" ind1=" " ind2=" ">
@@ -481,7 +511,8 @@ sub itemrequested {
     my ( $biblionumber, $biblioitemnumber ) = AddBiblio( $record, 'FA' );
     warn "biblionumber $biblionumber created";
 
-    # Add an item FIXME This should not be hardcoded
+    # Add an item 
+    # FIXME Data should not be hardcoded
     my $item = {
         'homebranch'    => 'ILL',
         'holdingbranch' => 'ILL',
@@ -494,38 +525,36 @@ sub itemrequested {
     my $cardnumber = $request->{$message}->{UserId}->{UserIdentifierValue};
     my $borrower = GetMember( 'cardnumber' => $cardnumber );
 
-    # Create a new request with the newly created biblionumber
-
+    # Save a new request with the newly created biblionumber
     my $illrequest = Koha::Illrequest->new;
     $illrequest->load_backend( 'NNCIPP' );
     my $backend_result = $illrequest->backend_create({
         'borrowernumber' => $borrower->{borrowernumber},
         'biblionumber'   => $biblionumber,
         'branchcode'     => 'ILL', # FIXME
-        'status'         => 'ORDERED',
-        'medium'         => 'Book', # FIXME
+        'status'         => 'H_ITEMREQUESTED',
+        'medium'         => $bibdata->{MediumType},
         'backend'        => 'NNCIPP',
         'attr'           => {
             'title'        => $bibdata->{Title},
             'author'       => $bibdata->{Author},
             'ordered_from' => $ordered_from,
+            'ordered_from_borrowernumber' => $ordered_from_patron->{borrowernumber},
             'id'           => 1,
+            'PlaceOfPublication'  => $bibdata->{PlaceOfPublication},
+            'Publisher'           => $bibdata->{Publisher},
+            'PublicationDate'     => $bibdata->{PublicationDate},
+            'Language'            => $bibdata->{Language},
+            'ItemIdentifierType'  => $request->{$message}->{ItemId}->{ItemIdentifierType},
+            'ItemIdentifierValue' => $request->{$message}->{ItemId}->{ItemIdentifierValue},
+            'RequestType'         => $request->{$message}->{RequestType},
+            'RequestScopeType'    => $request->{$message}->{RequestScopeType},
         },
         'stage'          => 'commit',
     });
-    warn Dumper $illrequest;
     warn Dumper $backend_result;
 
-    # OLDWAY
-    # my $illRequest   = Koha::Illrequests->new;
-    # my $saved_request = $illRequest->request({
-    #     'biblionumber' => $biblionumber,
-    #     'branch'       => 'ILL', # FIXME
-    #     'borrower'     => $borrower->{'borrowernumber'},
-    #     'ordered_from' => $ordered_from,
-    #     'status'       => 'ORDERED'
-    # });
-
+    # Data for ItemRequestedResponse
     my $data = {
         RequestType  => $message,
         ToAgencyId   => $request->{$message}->{InitiationHeader}->{FromAgencyId}->{AgencyId},
@@ -536,6 +565,9 @@ sub itemrequested {
 
     $response->data($data);
     return $response;
+
+    # This should trigger an immediate RequestItem back to the Owner Library
+    # But the server should probably not be the one sending it...
 
 }
 
@@ -927,7 +959,7 @@ sub _get_langcode_from_bibliodata {
 
     my ( $bibliodata ) = @_;
 
-    my $marcxml = $bibliodata->{'marcxml'};
+    my $marcxml = GetXmlBiblio ($bibliodata->{'biblionumber'} );
     my $record = MARC::Record->new_from_xml( $marcxml, 'UTF-8' );
     if ( $record->field( '008' ) && $record->field( '008' )->data() ) {
         my $f008 = $record->field( '008' )->data();
