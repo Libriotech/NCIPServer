@@ -27,7 +27,7 @@ use C4::Items qw { AddItem GetItem GetItemsByBiblioitemnumber };
 use C4::Reserves qw {CanBookBeReserved AddReserve CancelReserve };
 use C4::Log;
 
-use Koha::Illrequest;
+use Koha::Illrequests;
 use Koha::Illrequest::Config;
 use Koha::Libraries;
 
@@ -136,24 +136,21 @@ sub itemshipped {
     # Change the status of the request
     # Find the request
     my $Illrequests = Koha::Illrequests->new;
-    my $saved_request = $Illrequests->search({
-        # This is a request we have sent out ourselves, so we can use the value
-        # of RequestIdentifierValue directly against the id column
-        'remote_id' => $request->{$message}->{RequestId}->{AgencyId} . ':' . $request->{$message}->{RequestId}->{RequestIdentifierValue},
+    my $saved_request = $Illrequests->find({
+        'orderid' => $request->{$message}->{RequestId}->{AgencyId} . ':' . $request->{$message}->{RequestId}->{RequestIdentifierValue},
     });
-    # Check if this is a request we created or not
-    if ( exists config->{'isilmap'}->{ $request->{$message}->{RequestId}->{AgencyId} } ) {
-        # If the AgencyId in the RequestId is one of ours, we created the request in
-        # the first place, and we are the Home Library
-        $saved_request->editStatus({ 'status' => 'SHIPPING' });
-    } else {
-        # If the AgencyId is not in the "isilmap" we are the Owner Library
-        $saved_request->editStatus({ 'status' => 'SHIPPING_O' });
-    }
-    $saved_request->editStatus({ 'remote_barcode' => $request->{$message}->{ItemId}->{ItemIdentifierValue} });
+    # warn Dumper $saved_request;
+    warn Dumper $saved_request->status;
+    # Check if we are the Home Library or not
+    if ( $saved_request->status eq 'H_REQUESTITEM' ) {
+        # We are the Home Library and we are being told that the Owner Library
+        # has shipped the item we want (or a replacement for it)
+        warn "Setting status to H_ITEMSHIPPED";
+        $saved_request->status( 'H_ITEMSHIPPED' )->store;
+    } # FIXME elsif ( $saved_request->status eq 'O_ITEMRECEIVED' ) {
+        # $saved_request->status( 'H_ITEMSHIPPED' )->store;
+    # }
 
-    # FIXME Update the bibliographic data if new data is sent
-    
     my $data = {
         fromagencyid           => $request->{$message}->{InitiationHeader}->{ToAgencyId}->{AgencyId},
         toagencyid             => $request->{$message}->{InitiationHeader}->{FromAgencyId}->{AgencyId},
@@ -540,7 +537,7 @@ sub itemrequested {
             'author'       => $bibdata->{Author},
             'ordered_from' => $ordered_from,
             'ordered_from_borrowernumber' => $ordered_from_patron->{borrowernumber},
-            'id'           => 1,
+            # 'id'           => 1,
             'PlaceOfPublication'  => $bibdata->{PlaceOfPublication},
             'Publisher'           => $bibdata->{Publisher},
             'PublicationDate'     => $bibdata->{PublicationDate},
@@ -722,6 +719,37 @@ will be ORDERED.
 =cut
 
 sub cancelrequestitem {
+
+    my $self = shift;
+    my $request = shift;
+    # Check our session and login if necessary:
+    # FIXME $self->login() unless ($self->checkauth());
+
+    # Common stuff:
+    my $message = $self->parse_request_type($request);
+    my $response = NCIP::Response->new({type => $message . 'Response'});
+    $response->header($self->make_header($request));
+
+    my $Illrequests = Koha::Illrequests->new;
+    my $saved_request = $Illrequests->search({
+        'requested_by'           => $request->{$message}->{RequestId}->{AgencyId},
+        'RequestIdentifierValue' => $request->{$message}->{RequestId}->{RequestIdentifierValue},
+    });
+
+    unless ( $saved_request ) {
+        my $problem = NCIP::Problem->new({
+            ProblemType    => 'RequestItem can not be cancelled',
+            ProblemDetail  => "Request with id " . $request->{$message}->{RequestId}->{RequestIdentifierValue} . " unknown",
+            ProblemElement => 'RequestIdentifierValue',
+            ProblemValue   => $request->{$message}->{RequestId}->{RequestIdentifierValue},
+        });
+        $response->problem($problem);
+        return $response;
+    }
+
+}
+
+sub cancelrequestitem_old {
 
     my $self = shift;
     my $request = shift;
