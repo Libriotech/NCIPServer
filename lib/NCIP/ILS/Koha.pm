@@ -139,8 +139,6 @@ sub itemshipped {
     my $saved_request = $Illrequests->find({
         'orderid' => $request->{$message}->{RequestId}->{AgencyId} . ':' . $request->{$message}->{RequestId}->{RequestIdentifierValue},
     });
-    # warn Dumper $saved_request;
-    warn Dumper $saved_request->status;
     # Check if we are the Home Library or not
     if ( $saved_request->status eq 'H_REQUESTITEM' ) {
         # We are the Home Library and we are being told that the Owner Library
@@ -186,14 +184,19 @@ sub itemreceived {
     my $response = NCIP::Response->new({type => $message . 'Response'});
     $response->header($self->make_header($request));
 
-    # FIXME Change the status of the request
+    # Change the status of the request
     # Find the request
     my $Illrequests = Koha::Illrequests->new;
-    my $saved_request = $Illrequests->search({
-        'status'    => 'SHIPPED',
-        'remote_id' => $request->{$message}->{RequestId}->{AgencyId} . ':' . $request->{$message}->{RequestId}->{RequestIdentifierValue},
+    my $saved_request = $Illrequests->find({
+        'orderid' => $request->{$message}->{RequestId}->{AgencyId} . ':' . $request->{$message}->{RequestId}->{RequestIdentifierValue},
     });
-    $saved_request->editStatus({ 'status' => 'RECEIVED' });
+    # Check if we are the Owner Library or not
+    if ( $saved_request->status eq 'O_ITEMSHIPPED' ) {
+        warn "Setting status to O_ITEMRECEIVED";
+        $saved_request->status( 'O_ITEMRECEIVED' )->store;
+    } # FIXME elsif ( $saved_request->status eq 'O_ITEMRECEIVED' ) {
+        # $saved_request->status( 'H_ITEMSHIPPED' )->store;
+    # }
 
     my $data = {
         fromagencyid           => $request->{$message}->{InitiationHeader}->{ToAgencyId}->{AgencyId},
