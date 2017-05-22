@@ -145,7 +145,7 @@ sub itemshipped {
         # has shipped the item we want (or a replacement for it)
         warn "Setting status to H_ITEMSHIPPED";
         $saved_request->status( 'H_ITEMSHIPPED' )->store;
-    } FIXME elsif ( $saved_request->status eq 'O_ITEMRECEIVED' ) {
+    } elsif ( $saved_request->status eq 'O_ITEMRECEIVED' ) {
         $saved_request->status( 'O_RETURNED' )->store;
     }
 
