@@ -192,10 +192,11 @@ sub itemreceived {
     });
     # Check if we are the Owner Library or not
     if ( $saved_request->status eq 'O_ITEMSHIPPED' ) {
-        warn "Setting status to O_ITEMRECEIVED";
+        # We are the Owner Library, so this is #5
         $saved_request->status( 'O_ITEMRECEIVED' )->store;
-    } # FIXME elsif ( $saved_request->status eq 'O_ITEMRECEIVED' ) {
-        # $saved_request->status( 'H_ITEMSHIPPED' )->store;
+    } elsif ( $saved_request->status eq 'H_RETURNED' ) {
+        # We are the Home Library, so this is #7
+        $saved_request->status( 'DONE' )->store;
     # }
 
     my $data = {
