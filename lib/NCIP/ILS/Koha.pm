@@ -711,14 +711,17 @@ This can be the result of:
 
 =over 4
 
-=item * the Home library cancelling a RequestItem
+=item * the Home library cancelling a RequestItem (#10). Status at the Owner
+Library will change from O_REQUESTITEM to DONE.
 
-=item * the Owner library rejecting a RequestItem
+=item * the Owner library rejecting a RequestItem (#11). Status at the Home
+Library will change from H_REQUESTITEM to CANCELLED. This must prompt a librarian
+to look into the reasons for cancelleing and deciding whether to make a new
+request to another library. After this has been done, the request status should
+change from CANCELLED to DONE (but that will be the responsibility of the
+NNCIPP ILL backend in Koha).
 
 =back
-
-In the first case, the status will be NEW or SHIPPED. In the second case, it
-will be ORDERED.
 
 =cut
 
@@ -734,12 +737,14 @@ sub cancelrequestitem {
     my $response = NCIP::Response->new({type => $message . 'Response'});
     $response->header($self->make_header($request));
 
+    # Find the request
     my $Illrequests = Koha::Illrequests->new;
-    my $saved_request = $Illrequests->search({
-        'requested_by'           => $request->{$message}->{RequestId}->{AgencyId},
-        'RequestIdentifierValue' => $request->{$message}->{RequestId}->{RequestIdentifierValue},
+    my $saved_request = $Illrequests->find({
+        'orderid' => $request->{$message}->{RequestId}->{AgencyId} . ':' . $request->{$message}->{RequestId}->{RequestIdentifierValue},
     });
 
+    # Unknown request
+    # FIXME This should probably be a sub, called from all the NCIP-verb subs
     unless ( $saved_request ) {
         my $problem = NCIP::Problem->new({
             ProblemType    => 'RequestItem can not be cancelled',
@@ -750,6 +755,26 @@ sub cancelrequestitem {
         $response->problem($problem);
         return $response;
     }
+
+    # Check if we are the Owner Library or not
+    if ( $saved_request->status eq 'O_REQUESTITEM' ) {
+        # We are the Owner Library, so this is #10
+        $saved_request->status( 'DONE' )->store;
+    } elsif ( $saved_request->status eq 'H_REQUESTITEM' ) {
+        # We are the Home Library, so this is #11
+        $saved_request->status( 'CANCELLED' )->store;
+    # }
+
+    my $data = {
+        fromagencyid           => $request->{$message}->{InitiationHeader}->{ToAgencyId}->{AgencyId},
+        toagencyid             => $request->{$message}->{InitiationHeader}->{FromAgencyId}->{AgencyId},
+        AgencyId               => $request->{$message}->{RequestId}->{AgencyId},
+        RequestIdentifierValue => $request->{$message}->{RequestId}->{RequestIdentifierValue},
+        RequestType            => $request->{$message}->{RequestType},
+    };
+
+    $response->data($data);
+    return $response;
 
 }
 
