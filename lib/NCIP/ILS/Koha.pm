@@ -763,7 +763,18 @@ sub cancelrequestitem {
     } elsif ( $saved_request->status eq 'H_REQUESTITEM' ) {
         # We are the Home Library, so this is #11
         $saved_request->status( 'CANCELLED' )->store;
-    # }
+    } else {
+        # We have some status where the RequestItem can not be cancelled,
+        # most likely the request is already shipped from the Owner Library.
+        my $problem = NCIP::Problem->new({
+            ProblemType    => 'RequestItem can not be cancelled',
+            ProblemDetail  => "Request with id " . $request->{$message}->{RequestId}->{RequestIdentifierValue} . " can not be cancelled",
+            ProblemElement => 'RequestIdentifierValue',
+            ProblemValue   => $request->{$message}->{RequestId}->{RequestIdentifierValue},
+        });
+        $response->problem($problem);
+        return $response;
+    }
 
     my $data = {
         fromagencyid           => $request->{$message}->{InitiationHeader}->{ToAgencyId}->{AgencyId},
