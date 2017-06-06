@@ -197,7 +197,7 @@ sub itemreceived {
     } elsif ( $saved_request->status eq 'H_RETURNED' ) {
         # We are the Home Library, so this is #7
         $saved_request->status( 'DONE' )->store;
-    # }
+    }
 
     my $data = {
         fromagencyid           => $request->{$message}->{InitiationHeader}->{ToAgencyId}->{AgencyId},
