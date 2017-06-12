@@ -324,7 +324,7 @@ sub requestitem {
     # Locate an item that we can connect the request to
     my $items = GetItemsByBiblioitemnumber( $biblionumber );
     # FIXME C4::Reserves::CanItemBeReserved()
-    # For now, we just reserve the first one
+    # FIXME Add a hold on the item. Will this possibly conflict with AllowOnShelfHolds? (Which is now part of the circ rules, not a syspref.)
     my $item = $items->[0];
 
     # NEW WAY
