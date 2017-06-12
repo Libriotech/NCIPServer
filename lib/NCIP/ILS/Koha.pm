@@ -653,16 +653,16 @@ sub renewitem {
     # Do the actual renewal
     my $datedue = AddRenewal( $borrower->{'borrowernumber'}, $itemdata->{'itemnumber'} );
     if ( $datedue ) {
-        # The renewal was successfull, change the status of the request
-        # Find the request
-        my $Illrequests = Koha::Illrequests->new;
-        my $saved_requests = $Illrequests->search({
-            'status'         => 'RECEIVED',
-            'remote_barcode' => $request->{$message}->{ItemId}->{ItemIdentifierValue},
-        });
-        # There should only be one request, so we use the zero'th one
-        my $saved_request = $saved_requests->[0];
-        $saved_request->editStatus({ 'status' => 'RENEWED' });
+
+        # The renewal was successfull, change the status of the request?
+
+        # Find the request - nah, we don't really need it for anything?
+        # my $Illrequests = Koha::Illrequests->new;
+        # my $saved_request = $Illrequests->find({
+        #     'orderid' => $request->{$message}->{RequestId}->{AgencyId} . ':' . $request->{$message}->{RequestId}->{RequestIdentifierValue},
+        # });
+        # $saved_request->status( 'O_ITEMRECEIVED' )->store;
+
         # Check the number of remaning renewals
         my ( $renewcount, $renewsallowed, $renewsleft ) = GetRenewCount( $borrower->{'borrowernumber'}, $itemdata->{'itemnumber'} );
         # Send the response
