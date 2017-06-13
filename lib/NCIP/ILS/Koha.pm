@@ -762,7 +762,7 @@ sub cancelrequestitem {
         $saved_request->status( 'DONE' )->store;
     } elsif ( $saved_request->status eq 'H_REQUESTITEM' ) {
         # We are the Home Library, so this is #11
-        $saved_request->status( 'CANCELLED' )->store;
+        $saved_request->status( 'H_CANCELLED' )->store;
     } else {
         # We have some status where the RequestItem can not be cancelled,
         # most likely the request is already shipped from the Owner Library.
