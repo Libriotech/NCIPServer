@@ -637,7 +637,8 @@ sub renewitem {
         }
     }
 
-    my $borrower = GetMember( cardnumber => _isil2barcode( $request->{$message}->{InitiationHeader}->{FromAgencyId}->{AgencyId} ) );
+    my $cardnumber = _isil2barcode( $request->{$message}->{InitiationHeader}->{FromAgencyId}->{AgencyId} );
+    my $borrower = GetMember( cardnumber => $cardnumber );
 
     # Check if renewal is possible
     my ($ok,$error) = CanBookBeRenewed( $borrower->{'borrowernumber'}, $itemdata->{'itemnumber'} );
