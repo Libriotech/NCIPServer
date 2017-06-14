@@ -593,30 +593,30 @@ sub renewitem {
     $response->header($self->make_header($request));
 
     # Find the cardnumber of the borrower
-    my ( $cardnumber, $cardnumber_field ) = $self->find_user_barcode( $request );
-    unless( $cardnumber ) {
-        my $problem = NCIP::Problem->new({
-            ProblemType    => 'Needed Data Missing',
-            ProblemDetail  => 'Cannot find user barcode in message',
-            ProblemElement => $cardnumber_field,
-            ProblemValue   => 'NULL',
-        });
-        $response->problem($problem);
-        return $response;
-    }
+    # my ( $cardnumber, $cardnumber_field ) = $self->find_user_barcode( $request );
+    # unless( $cardnumber ) {
+    #     my $problem = NCIP::Problem->new({
+    #         ProblemType    => 'Needed Data Missing',
+    #         ProblemDetail  => 'Cannot find user barcode in message',
+    #         ProblemElement => $cardnumber_field,
+    #         ProblemValue   => 'NULL',
+    #     });
+    #     $response->problem($problem);
+    #     return $response;
+    # }
 
     # Find the borrower based on the cardnumber
-    my $borrower = GetMember( 'cardnumber' => $cardnumber );
-    unless ( $borrower ) {
-        my $problem = NCIP::Problem->new({
-            ProblemType    => 'Unknown User',
-            ProblemDetail  => "User with barcode $cardnumber unknown",
-            ProblemElement => $cardnumber_field,
-            ProblemValue   => 'NULL',
-        });
-        $response->problem($problem);
-        return $response;
-    }
+    # my $borrower = GetMember( 'cardnumber' => $cardnumber );
+    # unless ( $borrower ) {
+    #     my $problem = NCIP::Problem->new({
+    #         ProblemType    => 'Unknown User',
+    #         ProblemDetail  => "User with barcode $cardnumber unknown",
+    #         ProblemElement => $cardnumber_field,
+    #         ProblemValue   => 'NULL',
+    #     });
+    #     $response->problem($problem);
+    #     return $response;
+    # }
     
     my $itemdata;
     # Find the barcode from the request, if there is one
@@ -636,7 +636,9 @@ sub renewitem {
             return $response;
         }
     }
-    
+
+    my $borrower = GetMember( cardnumber => _isil2barcode( $request->{$message}->{InitiationHeader}->{FromAgencyId}->{AgencyId} ) );
+
     # Check if renewal is possible
     my ($ok,$error) = CanBookBeRenewed( $borrower->{'borrowernumber'}, $itemdata->{'itemnumber'} );
     unless ( $ok ) {
