@@ -116,8 +116,15 @@ sub lookupagency {
 
 Handle the NCIP ItemShipped message.
 
-Set status = SHIPPING_O if we are the Owner Library
-Set status = SHIPPING if we are the Home Library
+This gets called in two different ways:
+
+1. The Owner Library has shipped an item to the Home Library. Status changes
+from H_REQUESTITEM to H_ITEMSHIPPED. This is NNCIPP call number 4. This should
+also trigger a hold at the Home Library, to connect the item with the actual
+patron waiting for it.
+
+2. The Home Library has shipped an item back to the Owner Library. Status
+changes from O_ITEMRECEIVED to O_RETURNED. This is NNCIPP call number 6.
 
 =cut
 
@@ -145,6 +152,31 @@ sub itemshipped {
         # has shipped the item we want (or a replacement for it)
         warn "Setting status to H_ITEMSHIPPED";
         $saved_request->status( 'H_ITEMSHIPPED' )->store;
+        # Find the item
+        my $biblio = Koha::Biblio->find({ 'biblionumber' => $saved_request->biblio_id });
+        my @items = $biblio->items();
+        # There should only be one item, so we grap the first one
+        my $item = $items[0];
+        # Place a hold
+        my $canReserve = CanItemBeReserved( $saved_request->{'borrowernumber'}, $item->{'itemnumber'} );
+        if ($canReserve eq 'OK') {
+            AddReserve(
+                'ILL',                               # branch FIXME Should this be not hardcoded? Should it be the branch the book belongs to?
+                $saved_request->{'borrowernumber'},  # borrowernumber
+                $biblio->biblionumber,               # biblionumber
+                undef,                               # bibitems - Not used
+                undef,                               # priority
+                undef,                               # resdate
+                undef,                               # expdate
+                'Hold placed by NNCIPP',             # notes
+                '',                                  # title
+                $item->{'itemnumber'} || undef,      # checkitem
+                undef,                               # found
+                undef,                               # itemtype
+            );
+        } else {
+            warn "Can not place hold: $canReserve";
+        }
     } elsif ( $saved_request->status eq 'O_ITEMRECEIVED' ) {
         $saved_request->status( 'O_RETURNED' )->store;
     }
