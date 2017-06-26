@@ -30,6 +30,8 @@ use C4::Log;
 use Koha::Illrequests;
 use Koha::Illrequest::Config;
 use Koha::Libraries;
+use Koha::Biblio;
+use Koha::Biblios;
 
 use NCIP::Item::Id;
 use NCIP::Problem;
@@ -150,13 +152,12 @@ sub itemshipped {
     if ( $saved_request->status eq 'H_REQUESTITEM' ) {
         # We are the Home Library and we are being told that the Owner Library
         # has shipped the item we want (or a replacement for it)
-        warn "Setting status to H_ITEMSHIPPED";
-        $saved_request->status( 'H_ITEMSHIPPED' )->store;
         # Find the item
-        my $biblio = Koha::Biblio->find({ 'biblionumber' => $saved_request->biblio_id });
+        my $biblio_id = $saved_request->biblio_id or die "no biblio_id on saved_request";
+        my $biblio = Koha::Biblios->find({ 'biblionumber' => $biblio_id });
         my @items = $biblio->items();
         # There should only be one item, so we grap the first one
-        my $item = $items[0];
+        my $item = $items[0] or die "no items for biblio";
         # Place a hold
         my $canReserve = CanItemBeReserved( $saved_request->{'borrowernumber'}, $item->{'itemnumber'} );
         if ($canReserve eq 'OK') {
@@ -177,6 +178,8 @@ sub itemshipped {
         } else {
             warn "Can not place hold: $canReserve";
         }
+        warn "Setting status to H_ITEMSHIPPED";
+        $saved_request->status( 'H_ITEMSHIPPED' )->store;
     } elsif ( $saved_request->status eq 'O_ITEMRECEIVED' ) {
         $saved_request->status( 'O_RETURNED' )->store;
     }
