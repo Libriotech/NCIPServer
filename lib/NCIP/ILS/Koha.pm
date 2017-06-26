@@ -24,7 +24,7 @@ use C4::Biblio;
 use C4::Circulation qw { AddRenewal CanBookBeRenewed GetRenewCount };
 use C4::Members qw{ GetMember };
 use C4::Items qw { AddItem GetItem GetItemsByBiblioitemnumber };
-use C4::Reserves qw {CanBookBeReserved AddReserve CancelReserve };
+use C4::Reserves qw { CanBookBeReserved CanItemBeReserved AddReserve CancelReserve };
 use C4::Log;
 
 use Koha::Illrequests;
@@ -218,8 +218,6 @@ sub itemreceived {
 
 Handle the NCIP RequestItem message.
 
-Set status = ???
-
 =cut
 
 sub requestitem {
@@ -321,13 +319,7 @@ sub requestitem {
         return $response;
     }
 
-    # Locate an item that we can connect the request to
-    my $items = GetItemsByBiblioitemnumber( $biblionumber );
-    # FIXME C4::Reserves::CanItemBeReserved()
-    # FIXME Add a hold on the item. Will this possibly conflict with AllowOnShelfHolds? (Which is now part of the circ rules, not a syspref.)
-    my $item = $items->[0];
-
-    # NEW WAY
+    # Save the request
     my $illrequest = Koha::Illrequest->new;
     $illrequest->load_backend( 'NNCIPP' );
     my $backend_result = $illrequest->backend_create({
@@ -349,62 +341,45 @@ sub requestitem {
         'stage'          => 'commit',
     });
 
-    # OLD WAY
-    # Create a new request with the biblionumber we have found
-    # my $illRequest   = Koha::Illrequests->new;
-    # my $saved_request = $illRequest->request({
-    #     'biblionumber' => $biblionumber,
-    #     'branch'       => 'ILL', # FIXME
-    #     'borrower'     => $borrower->{'borrowernumber'}, # Home Library
-    # });
-    # $saved_request->editStatus({
-    #     'remote_user'    => $request->{$message}->{UserId}->{UserIdentifierValue},
-    #     'remote_id'      => $request->{$message}->{RequestId}->{AgencyId} . ':' . $request->{$message}->{RequestId}->{RequestIdentifierValue},
-    #     'remote_barcode' => $item->{'barcode'},
-    #     'reqtype'        => $request->{$message}->{RequestType},
-    # });
+    # Check if the book (record level) can be reserved
+    my $canReserve = CanBookBeReserved( $borrower->{borrowernumber}, $biblionumber );
+    unless ($canReserve eq 'OK') {
+        my $problem = NCIP::Problem->new({
+            ProblemType    => 'No available items', # FIXME Check the wording of this problem message
+            ProblemDetail  => 'NULL',
+            ProblemElement => 'NULL',
+            ProblemValue   => 'NULL',
+        });
+        $response->problem($problem);
+        return $response;
+    }
 
-    # Check if it is possible to make a reservation
-    # if ( CanBookBeReserved( $borrower->{borrowernumber}, $itemdata->{biblionumber} )) {
-    #     my $biblioitemnumber = $itemdata->{biblionumber};
-    #     # Add reserve here
-    #     # FIXME We should be able to place an ILL request in the ILL module as an alternative workflow
-    #     AddReserve(
-    #         $response->{'header'}->{'ToAgencyId'}->{'AgencyId'}, # branch
-    #         $borrower->{borrowernumber},                         # borrowernumber
-    #         $itemdata->{biblionumber},                           # biblionumber
-    #         'a',                                                 # constraint
-    #         [$biblioitemnumber],                                 # bibitems
-    #         1,                                                   # priority
-    #         undef,                                               # resdate
-    #         undef,                                               # expdate
-    #         'Placed By ILL',                                     # notes
-    #         '',                                                  # title
-    #         $itemdata->{'itemnumber'} || undef,                  # checkitem
-    #         undef,                                               # found
-    #     );
-    #     if ($biblionumber) {
-    #         my $reserves = GetReservesFromBiblionumber({
-    #             biblionumber => $itemdata->{biblionumber}
-    #         });
-    #         $request_id = $reserves->[1]->{reserve_id};
-    #     } else {
-    #         my ( $reservedate, $borrowernumber, $branchcode2, $reserve_id,
-    #             $wait )
-    #           = GetReservesFromItemnumber( $itemdata->{'itemnumber'} ); # GetReservesFromItemnumber has been removed
-    #         $request_id = $reserve_id;
-    #     }
-    # } else {
-    #     # A reservation can not be made
-    #     my $problem = NCIP::Problem->new({
-    #         ProblemType        => 'Item Does Not Circulate',
-    #             ProblemDetail  => 'Request of Item cannot proceed because the Item is non-circulating',
-    #             ProblemElement => 'BibliographicRecordIdentifier',
-    #             ProblemValue   => 'NULL',
-    #     });
-    #     $response->problem($problem);
-    #     return $response;
-    # }
+    # Locate an item that we can connect the hold to, and create the hold
+    # FIXME Possible conflict with AllowOnShelfHolds? (Which is now part of the circ rules, not a syspref.)
+    my $item;
+    my $items = GetItemsByBiblioitemnumber( $biblionumber );
+    foreach my $this_item ( @{ $items } ) {
+        my $canReserve = CanItemBeReserved( $borrower->{'borrowernumber'}, $this_item->{'itemnumber'} );
+        if ($canReserve eq 'OK') {
+            AddReserve(
+                'ILL',                               # branch FIXME Should this be not hardcoded? Should it be the branch the book belongs to?
+                $borrower->{'borrowernumber'},       # borrowernumber
+                $biblionumber,                       # biblionumber
+                undef,                               # bibitems - Not used
+                undef,                               # priority
+                undef,                               # resdate
+                undef,                               # expdate
+                'Hold placed by NNCIPP',             # notes
+                '',                                  # title
+                $this_item->{'itemnumber'} || undef, # checkitem
+                undef,                               # found
+                undef,                               # itemtype
+            );
+            $item = $this_item;
+        } else {
+            warn "Can not place hold: $canReserve";
+        }
+    }
 
     # Build the response
     my $data = {
