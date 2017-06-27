@@ -156,14 +156,15 @@ sub itemshipped {
         my $biblio_id = $saved_request->biblio_id or die "no biblio_id on saved_request";
         my $biblio = Koha::Biblios->find({ 'biblionumber' => $biblio_id });
         my @items = $biblio->items();
+        @items == 1 or die "expected only 1 entry for $biblio_id, got: ".scalar(@items);
         # There should only be one item, so we grap the first one
-        my $item = $items[0] or die "no items for biblio";
+        my $item = $items[0];
         # Place a hold
-        my $canReserve = CanItemBeReserved( $saved_request->{'borrowernumber'}, $item->{'itemnumber'} );
+        my $canReserve = CanItemBeReserved( $saved_request->borrowernumber, $item->itemnumber );
         if ($canReserve eq 'OK') {
             AddReserve(
                 'ILL',                               # branch FIXME Should this be not hardcoded? Should it be the branch the book belongs to?
-                $saved_request->{'borrowernumber'},  # borrowernumber
+                $saved_request->borrowernumber,  # borrowernumber
                 $biblio->biblionumber,               # biblionumber
                 undef,                               # bibitems - Not used
                 undef,                               # priority
@@ -171,7 +172,7 @@ sub itemshipped {
                 undef,                               # expdate
                 'Hold placed by NNCIPP',             # notes
                 '',                                  # title
-                $item->{'itemnumber'} || undef,      # checkitem
+                $item->itemnumber || undef,      # checkitem
                 undef,                               # found
                 undef,                               # itemtype
             );
