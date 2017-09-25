@@ -990,9 +990,9 @@ sub cancelrequestitem_old {
 sub _isil2barcode {
 
     my ( $s ) = @_;
+    return unless $s;
     $s =~ s/^NO-//i;
     return $s;
-
 }
 
 =head2 _get_biblionumber_from_standardnumber
